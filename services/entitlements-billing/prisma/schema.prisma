@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Transactional outbox (constitution §5) — see packages/ts-platform/src/outbox/outbox.prisma.fragment
+model OutboxEvent {
+  id               String    @id @default(uuid())
+  eventId          String    @unique
+  eventType        String
+  aggregateId      String
+  aggregateVersion Int
+  correlationId    String
+  causationId      String?
+  producedBy       String
+  schemaVersion    Int
+  data             Json
+  occurredAt       DateTime  @default(now()) @db.Timestamptz(3)
+  publishedAt      DateTime? @db.Timestamptz(3)
+
+  @@index([publishedAt])
+}
+
+// --- Entitlements & Billing domain models (T098, T100, T101) ---
+
+enum EntitlementSource {
+  free_allowance
+  one_time_purchase
+  subscription
+}
+
+/// One row per (userId, calendarMonthKey) tracking the free-allowance counter (T099,
+/// FR-030, resolved via /speckit-clarify). calendarMonthKey is a placeholder UTC
+/// YYYY-MM key pending the registered-address-city → timezone mapping decision (spec
+/// Open Question 18) — data-model.md's Schema Design Review Gates already flags this.
+model PublishingEntitlementLedger {
+  id                      String @id @default(uuid())
+  userId                  String
+  calendarMonthKey        String
+  // Cap 3 (FR-030). Never decremented — stopping/expiring an offer does not refund the
+  // slot, and a rebroadcast counts again.
+  freeOffersUsedThisMonth Int    @default(0)
+
+  @@unique([userId, calendarMonthKey])
+}
+
+model EntitlementLedgerEntry {
+  id                String            @id @default(uuid())
+  userId            String
+  offerId           String            @unique
+  entitlementSource EntitlementSource
+  reservedAt        DateTime          @default(now()) @db.Timestamptz(3)
+
+  @@index([userId])
+}
+
+enum SubscriptionPlan {
+  weekly
+  monthly
+  yearly
+}
+
+enum SubscriptionStatus {
+  active
+  cancelled_pending_period_end
+  expired
+}
+
+model Subscription {
+  id               String             @id @default(uuid())
+  userId           String
+  plan             SubscriptionPlan
+  status           SubscriptionStatus @default(active)
+  currentPeriodEnd DateTime           @db.Timestamptz(3)
+  basePriceMinor   Int
+  // 10 for monthly, 20 for yearly, 0 for weekly (FR-037).
+  discountPct      Int
+  currency         String
+  createdAt        DateTime           @default(now()) @db.Timestamptz(3)
+
+  @@index([userId, status])
+}
+
+enum OneTimeBroadcastPurchaseStatus {
+  granted
+  consumed
+}
+
+model OneTimeBroadcastPurchase {
+  id                String                         @id @default(uuid())
+  userId            String
+  priceMinor        Int
+  currency          String
+  status            OneTimeBroadcastPurchaseStatus @default(granted)
+  consumedByOfferId String?
+  createdAt         DateTime                       @default(now()) @db.Timestamptz(3)
+
+  @@index([userId, status])
+}

@@ -1,0 +1,7 @@
+node_modules/
+dist/
+build/
+coverage/
+**/prisma/migrations/
+apps/stranger_flutter/build/
+apps/stranger_flutter/.dart_tool/

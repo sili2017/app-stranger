@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Transactional outbox (constitution §5) — see packages/ts-platform/src/outbox/outbox.prisma.fragment
+model OutboxEvent {
+  id               String    @id @default(uuid())
+  eventId          String    @unique
+  eventType        String
+  aggregateId      String
+  aggregateVersion Int
+  correlationId    String
+  causationId      String?
+  producedBy       String
+  schemaVersion    Int
+  data             Json
+  occurredAt       DateTime  @default(now()) @db.Timestamptz(3)
+  publishedAt      DateTime? @db.Timestamptz(3)
+
+  @@index([publishedAt])
+}
+
+// --- Messaging domain models (T076) ---
+
+enum ChatStatus {
+  active
+  archived_readonly
+}
+
+model Chat {
+  id        String     @id @default(uuid())
+  offerId   String     @unique
+  status    ChatStatus @default(active)
+  createdAt DateTime   @default(now()) @db.Timestamptz(3)
+
+  memberships ChatMembership[]
+  messages    Message[]
+}
+
+model ChatMembership {
+  id       String   @id @default(uuid())
+  chatId   String
+  chat     Chat     @relation(fields: [chatId], references: [id])
+  userId   String
+  joinedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([chatId, userId])
+  @@index([chatId])
+  @@index([userId])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id])
+  senderId  String
+  // Restricted (data-model.md): never in a standard log line.
+  body      String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([chatId, createdAt])
+}

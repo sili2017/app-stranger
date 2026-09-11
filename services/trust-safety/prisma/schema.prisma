@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Transactional outbox (constitution §5) — see packages/ts-platform/src/outbox/outbox.prisma.fragment
+model OutboxEvent {
+  id               String    @id @default(uuid())
+  eventId          String    @unique
+  eventType        String
+  aggregateId      String
+  aggregateVersion Int
+  correlationId    String
+  causationId      String?
+  producedBy       String
+  schemaVersion    Int
+  data             Json
+  occurredAt       DateTime  @default(now()) @db.Timestamptz(3)
+  publishedAt      DateTime? @db.Timestamptz(3)
+
+  @@index([publishedAt])
+}
+
+// --- Trust & Safety domain models (T084, T088, T089, T092) ---
+
+/// Tracks the async 2-hour follow-up prompt (T085, FR-029, resolved via /speckit-clarify)
+/// separately from the submitted RatingFeedback itself. participation.selection-resolved
+/// carries no creator/recipient ids (contracts/events.md), so these are resolved lazily
+/// via internal calls to Offer/Participation when the scheduler actually sends the
+/// prompt, not at event-consumption time.
+model RatingPrompt {
+  id              String    @id @default(uuid())
+  offerId         String
+  selectionId     String    @unique
+  creatorUserId   String?
+  recipientUserId String?
+  resolvedAt      DateTime  @db.Timestamptz(3)
+  scheduledSendAt DateTime  @db.Timestamptz(3)
+  sentAt          DateTime? @db.Timestamptz(3)
+
+  @@index([scheduledSendAt, sentAt])
+}
+
+enum RatingVisibility {
+  pending_followup
+  public
+  removed
+}
+
+model RatingFeedback {
+  id              String           @id @default(uuid())
+  offerId         String
+  selectionId     String
+  raterUserId     String
+  rateeUserId     String
+  starRating      Int
+  writtenFeedback String?
+  photoAssetId    String?
+  // { subjectUserId, consentedAt }[] — matches data-model.md's RatingFeedback shape.
+  photoConsent    Json             @default("[]")
+  visibility      RatingVisibility @default(pending_followup)
+  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
+  publicAt        DateTime?        @db.Timestamptz(3)
+
+  @@unique([selectionId, raterUserId])
+  @@index([rateeUserId, visibility])
+}
+
+enum BlockStatus {
+  pending_review
+  enforced
+  rejected
+}
+
+model Block {
+  id           String      @id @default(uuid())
+  sourceUserId String
+  targetUserId String
+  status       BlockStatus @default(pending_review)
+  createdAt    DateTime    @default(now()) @db.Timestamptz(3)
+  decidedAt    DateTime?   @db.Timestamptz(3)
+
+  @@unique([sourceUserId, targetUserId])
+  @@index([sourceUserId])
+}
+
+enum ReportSubjectType {
+  user
+  offer
+  message
+  rating_feedback
+  photo
+}
+
+enum ReportStatus {
+  pending_review
+  enforced
+  rejected
+}
+
+model Report {
+  id             String            @id @default(uuid())
+  reporterUserId String
+  subjectType    ReportSubjectType
+  subjectId      String
+  reason         String?
+  status         ReportStatus      @default(pending_review)
+  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
+  decidedAt      DateTime?         @db.Timestamptz(3)
+
+  @@index([reporterUserId])
+  @@index([subjectType, subjectId])
+}
+
+model TrustedContactSetting {
+  id                     String   @id @default(uuid())
+  userId                 String   @unique
+  // Highly Restricted (data-model.md): encrypted at rest, never in a list/discovery response.
+  contactHandleEncrypted String
+  updatedAt              DateTime @updatedAt @db.Timestamptz(3)
+}
+
+/// T109: separate, immutable audit-event stream distinct from ordinary application logs
+/// (constitution §7) — every moderator/admin action writes here. No role system exists
+/// yet (ADQ-002a is open) so `actorUserId` is whatever the caller claims; that gap is
+/// inherent to every moderator-only endpoint in this codebase, not specific to auditing.
+model AuditLogEntry {
+  id          String   @id @default(uuid())
+  actorUserId String
+  action      String
+  subjectType String
+  subjectId   String
+  details     Json
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([subjectType, subjectId])
+  @@index([createdAt])
+}

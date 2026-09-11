@@ -1,0 +1,12 @@
+{
+  "name": "@stranger/web-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "T119: Playwright E2E tests driving the real Flutter Web build against the real backend (specs/tasks.md Phase 9).",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.44"
+  }
+}

@@ -1,0 +1,130 @@
+version: "3.9"
+
+# Local development stack: one PostgreSQL instance per service (per constitution §5's
+# isolated-ownership rule), one shared Redis (cache/rate-limit/ephemeral coordination,
+# plus the local pub/sub substitute for the durable event bus while ADQ-001 is open —
+# see packages/ts-platform/src/events/), and a local OIDC-compatible dev issuer
+# substituting for the approved auth provider while ADQ-002a is open.
+
+x-postgres-common: &postgres-common
+  image: postgres:16-alpine
+  restart: unless-stopped
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  postgres-identity-profile:
+    <<: *postgres-common
+    environment:
+      POSTGRES_DB: identity_profile
+      POSTGRES_USER: identity_profile
+      POSTGRES_PASSWORD: dev_only_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-identity-profile:/var/lib/postgresql/data
+
+  postgres-offer:
+    <<: *postgres-common
+    environment:
+      POSTGRES_DB: offer
+      POSTGRES_USER: offer
+      POSTGRES_PASSWORD: dev_only_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg-offer:/var/lib/postgresql/data
+
+  postgres-discovery-location:
+    <<: *postgres-common
+    environment:
+      POSTGRES_DB: discovery_location
+      POSTGRES_USER: discovery_location
+      POSTGRES_PASSWORD: dev_only_password
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg-discovery-location:/var/lib/postgresql/data
+
+  postgres-participation:
+    <<: *postgres-common
+    environment:
+      POSTGRES_DB: participation
+      POSTGRES_USER: participation
+      POSTGRES_PASSWORD: dev_only_password
+    ports:
+      - "5435:5432"
+    volumes:
+      - pg-participation:/var/lib/postgresql/data
+
+  postgres-messaging:
+    <<: *postgres-common
+    environment:
+      POSTGRES_DB: messaging
+      POSTGRES_USER: messaging
+      POSTGRES_PASSWORD: dev_only_password
+    ports:
+      - "5436:5432"
+    volumes:
+      - pg-messaging:/var/lib/postgresql/data
+
+  postgres-trust-safety:
+    <<: *postgres-common
+    environment:
+      POSTGRES_DB: trust_safety
+      POSTGRES_USER: trust_safety
+      POSTGRES_PASSWORD: dev_only_password
+    ports:
+      - "5437:5432"
+    volumes:
+      - pg-trust-safety:/var/lib/postgresql/data
+
+  postgres-entitlements-billing:
+    <<: *postgres-common
+    environment:
+      POSTGRES_DB: entitlements_billing
+      POSTGRES_USER: entitlements_billing
+      POSTGRES_PASSWORD: dev_only_password
+    ports:
+      - "5438:5432"
+    volumes:
+      - pg-entitlements-billing:/var/lib/postgresql/data
+
+  postgres-notification:
+    <<: *postgres-common
+    environment:
+      POSTGRES_DB: notification
+      POSTGRES_USER: notification
+      POSTGRES_PASSWORD: dev_only_password
+    ports:
+      - "5439:5432"
+    volumes:
+      - pg-notification:/var/lib/postgresql/data
+
+  postgres-media:
+    <<: *postgres-common
+    environment:
+      POSTGRES_DB: media
+      POSTGRES_USER: media
+      POSTGRES_PASSWORD: dev_only_password
+    ports:
+      - "5440:5432"
+    volumes:
+      - pg-media:/var/lib/postgresql/data
+
+volumes:
+  redis-data:
+  pg-identity-profile:
+  pg-offer:
+  pg-discovery-location:
+  pg-participation:
+  pg-messaging:
+  pg-trust-safety:
+  pg-entitlements-billing:
+  pg-notification:
+  pg-media:

@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Transactional outbox (constitution §5) — see packages/ts-platform/src/outbox/outbox.prisma.fragment
+model OutboxEvent {
+  id               String    @id @default(uuid())
+  eventId          String    @unique
+  eventType        String
+  aggregateId      String
+  aggregateVersion Int
+  correlationId    String
+  causationId      String?
+  producedBy       String
+  schemaVersion    Int
+  data             Json
+  occurredAt       DateTime  @default(now()) @db.Timestamptz(3)
+  publishedAt      DateTime? @db.Timestamptz(3)
+
+  @@index([publishedAt])
+}

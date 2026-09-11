@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Transactional outbox (constitution §5) — see packages/ts-platform/src/outbox/outbox.prisma.fragment
+model OutboxEvent {
+  id               String    @id @default(uuid())
+  eventId          String    @unique
+  eventType        String
+  aggregateId      String
+  aggregateVersion Int
+  correlationId    String
+  causationId      String?
+  producedBy       String
+  schemaVersion    Int
+  data             Json
+  occurredAt       DateTime  @default(now()) @db.Timestamptz(3)
+  publishedAt      DateTime? @db.Timestamptz(3)
+
+  @@index([publishedAt])
+}
+
+// --- Notification domain models (T108) ---
+
+enum PushPlatform {
+  ios
+  android
+  web
+}
+
+/// Restricted (data-model.md): push tokens are service-scoped, redacted from logs.
+model PushToken {
+  id        String       @id @default(uuid())
+  userId    String
+  token     String
+  platform  PushPlatform
+  updatedAt DateTime     @updatedAt @db.Timestamptz(3)
+
+  @@unique([userId, token])
+  @@index([userId])
+}
+
+enum NotificationChannel {
+  push
+  in_app
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+}
+
+model NotificationJob {
+  id          String              @id @default(uuid())
+  userId      String
+  channel     NotificationChannel
+  templateKey String
+  payload     Json
+  status      NotificationStatus  @default(pending)
+  createdAt   DateTime            @default(now()) @db.Timestamptz(3)
+  sentAt      DateTime?           @db.Timestamptz(3)
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+}

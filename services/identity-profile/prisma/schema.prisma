@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Transactional outbox (constitution §5) — see packages/ts-platform/src/outbox/outbox.prisma.fragment
+model OutboxEvent {
+  id               String    @id @default(uuid())
+  eventId          String    @unique
+  eventType        String
+  aggregateId      String
+  aggregateVersion Int
+  correlationId    String
+  causationId      String?
+  producedBy       String
+  schemaVersion    Int
+  data             Json
+  occurredAt       DateTime  @default(now()) @db.Timestamptz(3)
+  publishedAt      DateTime? @db.Timestamptz(3)
+
+  @@index([publishedAt])
+}
+
+// --- Identity & Profile domain models (T030-T034) ---
+
+enum AgeAssuranceStatus {
+  self_declared
+  liveness_passed
+  liveness_flagged_pending_id
+  id_verified
+  id_rejected_appeal_pending
+  restricted
+}
+
+enum AccountStatus {
+  active
+  disabled
+}
+
+/// Highly Restricted: dateOfBirth never appears in an API response or event
+/// (data-model.md Sensitive-Data Classification).
+model UserAccount {
+  id                 String             @id @default(uuid())
+  dateOfBirth        DateTime           @db.Timestamptz(3)
+  ageAssuranceStatus AgeAssuranceStatus @default(self_declared)
+  accountStatus      AccountStatus      @default(active)
+  createdAt          DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime           @updatedAt @db.Timestamptz(3)
+
+  publicProfile     PublicProfile?
+  registeredAddress RegisteredAddress?
+  verificationCases VerificationCase[]
+  cityInterests     CityInterest[]
+}
+
+enum ProfileVerificationStatus {
+  unverified
+  photo_verified
+  id_verified
+}
+
+model PublicProfile {
+  id                  String                    @id @default(uuid())
+  userId              String                    @unique
+  user                UserAccount               @relation(fields: [userId], references: [id])
+  firstName           String
+  photoAssetId        String?
+  ageRangeLabel       String
+  interests           String[]
+  verificationStatus  ProfileVerificationStatus @default(unverified)
+  languagePreference  String                    @default("en")
+  // Controlled public: average + count only, never individual feedback text
+  // (data-model.md Sensitive-Data Classification).
+  publicRatingAverage Float?
+  publicRatingCount   Int                       @default(0)
+  updatedAt           DateTime                  @updatedAt @db.Timestamptz(3)
+}
+
+model RegisteredAddress {
+  id               String      @id @default(uuid())
+  userId           String      @unique
+  user             UserAccount @relation(fields: [userId], references: [id])
+  city             String
+  country          String
+  // Nullable placeholder pending the city→timezone mapping decision (spec Open Question 18).
+  calendarTimezone String?
+  updatedAt        DateTime    @updatedAt @db.Timestamptz(3)
+}
+
+enum VerificationKind {
+  photo_liveness
+  government_id
+}
+
+enum VerificationStatus {
+  submitted
+  passed
+  flagged
+  rejected
+  appeal_pending
+  appeal_upheld
+  appeal_denied
+}
+
+model VerificationCase {
+  id              String             @id @default(uuid())
+  userId          String
+  user            UserAccount        @relation(fields: [userId], references: [id])
+  kind            VerificationKind
+  status          VerificationStatus @default(submitted)
+  // References Media by id only — never stores the file itself (data-model.md).
+  evidenceAssetId String?
+  createdAt       DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime           @updatedAt @db.Timestamptz(3)
+
+  @@index([userId])
+}
+
+model CityInterest {
+  id        String      @id @default(uuid())
+  userId    String
+  user      UserAccount @relation(fields: [userId], references: [id])
+  cityId    String
+  createdAt DateTime    @default(now()) @db.Timestamptz(3)
+
+  @@unique([userId, cityId])
+  @@index([userId])
+}
+
+/// T109: separate, immutable audit-event stream distinct from ordinary application logs
+/// (constitution §7) — every moderator/admin action (here: verification appeal
+/// decisions) writes here.
+model AuditLogEntry {
+  id          String   @id @default(uuid())
+  actorUserId String
+  action      String
+  subjectType String
+  subjectId   String
+  details     Json
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([subjectType, subjectId])
+  @@index([createdAt])
+}

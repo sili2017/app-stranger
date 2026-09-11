@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ts: 'services/**/*.ts'
+            flutter: 'apps/stranger_flutter/**'
+
+  node-lint-typecheck-test:
+    needs: detect-changes
+    if: contains(needs.detect-changes.outputs.services, 'ts')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18.17.0"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format
+      - run: npm run build
+      - run: npm test
+
+  flutter-analyze-format-test:
+    needs: detect-changes
+    if: contains(needs.detect-changes.outputs.services, 'flutter')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/stranger_flutter
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: dart format --output=none --set-exit-if-changed .
+      - run: flutter analyze
+      - run: flutter test
+      # Browser (Flutter Web) parity build — see specs/tasks.md Phase 9 (T115)
+      - run: flutter build web

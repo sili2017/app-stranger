@@ -1,0 +1,13 @@
+-- AlterTable
+ALTER TABLE "EntitlementLedgerEntry" ALTER COLUMN "reservedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "OneTimeBroadcastPurchase" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "OutboxEvent" ALTER COLUMN "occurredAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "publishedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "Subscription" ALTER COLUMN "currentPeriodEnd" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3);

@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Transactional outbox (constitution §5) — see packages/ts-platform/src/outbox/outbox.prisma.fragment
+model OutboxEvent {
+  id               String    @id @default(uuid())
+  eventId          String    @unique
+  eventType        String
+  aggregateId      String
+  aggregateVersion Int
+  correlationId    String
+  causationId      String?
+  producedBy       String
+  schemaVersion    Int
+  data             Json
+  occurredAt       DateTime  @default(now()) @db.Timestamptz(3)
+  publishedAt      DateTime? @db.Timestamptz(3)
+
+  @@index([publishedAt])
+}
+
+// --- Participation domain models (T069, T070) ---
+
+model ExpressionOfInterest {
+  id              String   @id @default(uuid())
+  offerId         String
+  recipientUserId String
+  message         String?
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  selection Selection?
+
+  @@unique([offerId, recipientUserId])
+  @@index([offerId])
+}
+
+enum SelectionOutcome {
+  pending
+  happened
+  cancelled
+}
+
+enum CancelledBy {
+  creator
+  recipient
+}
+
+model Selection {
+  id                     String               @id @default(uuid())
+  offerId                String
+  expressionOfInterestId String               @unique
+  expressionOfInterest   ExpressionOfInterest @relation(fields: [expressionOfInterestId], references: [id])
+  recipientUserId        String
+  selectedAt             DateTime             @default(now()) @db.Timestamptz(3)
+  outcome                SelectionOutcome     @default(pending)
+  cancelledBy            CancelledBy?
+  resolvedAt             DateTime?            @db.Timestamptz(3)
+
+  @@index([offerId])
+}

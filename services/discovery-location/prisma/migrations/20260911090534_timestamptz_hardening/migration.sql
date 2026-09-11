@@ -1,0 +1,13 @@
+-- AlterTable
+ALTER TABLE "CityInterest" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "DiscoveryEligibility" ALTER COLUMN "publishedAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "expiresAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "LocationSnapshot" ALTER COLUMN "capturedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "OutboxEvent" ALTER COLUMN "occurredAt" SET DATA TYPE TIMESTAMPTZ(3),
+ALTER COLUMN "publishedAt" SET DATA TYPE TIMESTAMPTZ(3);

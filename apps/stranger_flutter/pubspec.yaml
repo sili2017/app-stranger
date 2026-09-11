@@ -1,0 +1,36 @@
+name: stranger_flutter
+description: >
+  Stranger client — Android, iOS, tablet, and responsive-web (single Flutter
+  codebase, full feature parity per FR-041).
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  http: ^1.2.0
+  geolocator: ^12.0.0 # native GPS (T117) — web build falls back to the browser Geolocation API
+  firebase_core: ^3.0.0 # required by firebase_messaging's Firebase.initializeApp()
+  firebase_messaging: ^15.0.0 # FCM push (T108, T118)
+  intl: ^0.20.3 # l10n (T107, FR-040) — version pinned by flutter_localizations SDK
+  provider: ^6.1.2 # lightweight app state (current dev user, entitlements)
+  shared_preferences: ^2.2.3 # persist the dev user id across refreshes (web-compatible)
+  stranger_design_system:
+    path: ../../packages/dart-design-system
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true

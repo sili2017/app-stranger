@@ -1,3 +1,37 @@
 .DS_Store
 __pycache__/
 *.pyc
+
+# Node / TypeScript
+node_modules/
+dist/
+build/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+
+# Prisma
+**/prisma/migrations/dev.db
+services/*/generated/
+
+# Flutter / Dart
+apps/stranger_flutter/.dart_tool/
+apps/stranger_flutter/.flutter-plugins
+apps/stranger_flutter/.flutter-plugins-dependencies
+apps/stranger_flutter/build/
+apps/stranger_flutter/.pub-cache/
+apps/stranger_flutter/.pub/
+apps/stranger_flutter/ios/Pods/
+apps/stranger_flutter/android/.gradle/
+apps/stranger_flutter/lib/l10n/gen/
+
+# Local dev tooling (Postgres/Redis/Flutter SDK downloaded for local testing — see .tooling/README.md)
+.tooling/
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db

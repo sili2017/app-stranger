@@ -1,0 +1,13 @@
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    prefer_single_quotes: true
+    always_declare_return_types: true
+    avoid_print: true
+
+analyzer:
+  exclude:
+    - build/**
+    - "**/*.g.dart"
+    - web/**

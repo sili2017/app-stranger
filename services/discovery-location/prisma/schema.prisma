@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Transactional outbox (constitution §5) — see packages/ts-platform/src/outbox/outbox.prisma.fragment
+model OutboxEvent {
+  id               String    @id @default(uuid())
+  eventId          String    @unique
+  eventType        String
+  aggregateId      String
+  aggregateVersion Int
+  correlationId    String
+  causationId      String?
+  producedBy       String
+  schemaVersion    Int
+  data             Json
+  occurredAt       DateTime  @default(now()) @db.Timestamptz(3)
+  publishedAt      DateTime? @db.Timestamptz(3)
+
+  @@index([publishedAt])
+}
+
+// --- Discovery & Location domain models (T056, T058, T059) ---
+
+enum LocationSource {
+  live_gps
+  last_known
+}
+
+/// One row per user — the latest known location (T056). Highly Restricted lat/lng
+/// (data-model.md); never exposed directly, only via distanceBand/eligibility math.
+model LocationSnapshot {
+  userId     String         @id
+  lat        Float
+  lng        Float
+  source     LocationSource
+  capturedAt DateTime       @db.Timestamptz(3)
+}
+
+/// Local materialized copy of Identity & Profile's CityInterest, kept in sync via
+/// identity.city-interest-added/removed (T038, T058) — never a synchronous call per
+/// lookup (constitution §5: no service reads another service's private tables).
+model CityInterest {
+  id        String   @id @default(uuid())
+  userId    String
+  cityId    String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([userId, cityId])
+  @@index([userId])
+}
+
+enum EligibilityOfferStatus {
+  active
+  stopped
+  expired
+}
+
+/// Read model built from offer.published/stopped/expired (T059) — placeGeohash only,
+/// never the offer's exact lat/lng (constitution §3.IV, contracts/events.md Payload
+/// Minimization Rule).
+model DiscoveryEligibility {
+  offerId         String                 @id
+  creatorUserId   String
+  cityId          String
+  placeGeohash    String
+  placeKind       String
+  activityText    String
+  lifetimeMinutes Int
+  capacity        Int
+  status          EligibilityOfferStatus @default(active)
+  publishedAt     DateTime               @db.Timestamptz(3)
+  expiresAt       DateTime               @db.Timestamptz(3)
+  // Denormalized from participation.interest-expressed (T063, FR-042) — never carries
+  // recipientUserId (contracts/events.md: "never expose recipientUserId in a public response").
+  interestCount   Int                    @default(0)
+
+  @@index([status, cityId])
+}

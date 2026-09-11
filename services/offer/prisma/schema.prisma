@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Transactional outbox (constitution §5) — see packages/ts-platform/src/outbox/outbox.prisma.fragment
+model OutboxEvent {
+  id               String    @id @default(uuid())
+  eventId          String    @unique
+  eventType        String
+  aggregateId      String
+  aggregateVersion Int
+  correlationId    String
+  causationId      String?
+  producedBy       String
+  schemaVersion    Int
+  data             Json
+  occurredAt       DateTime  @default(now()) @db.Timestamptz(3)
+  publishedAt      DateTime? @db.Timestamptz(3)
+
+  @@index([publishedAt])
+}
+
+// --- Offer domain models (T044) ---
+
+enum PlaceKind {
+  pin
+  venue
+  live
+  moving
+}
+
+enum OfferStatus {
+  active
+  expired
+  stopped
+}
+
+enum MoneyPreferenceLabel {
+  creator_pays
+  byo
+  split
+  estimated_cost
+}
+
+model MeetOffer {
+  id            String @id @default(uuid())
+  creatorUserId String
+  cityId        String
+  activityText  String
+
+  // place: single immutable snapshot captured at publish time (Clarifications) —
+  // Highly Restricted lat/lng never leave this service except via the scoped
+  // internal place lookup (contracts/events.md); geohash is the Operational-classified
+  // truncated derivative published on offer.published.
+  placeKind             PlaceKind
+  placeLabel            String?
+  placeLat              Float
+  placeLng              Float
+  placeGeohash          String
+  // Required when placeKind == moving or a queue-style spot without a fixed venue (FR-002).
+  rendezvousInstruction String?
+  placeCapturedAt       DateTime  @default(now()) @db.Timestamptz(3)
+
+  // 5-30 minutes, default 15 (FR-003).
+  lifetimeMinutes Int         @default(15)
+  // Fixed at publish time, immutable while active, 1-10 (FR-008).
+  capacity        Int
+  status          OfferStatus @default(active)
+  publishedAt     DateTime    @default(now()) @db.Timestamptz(3)
+  expiresAt       DateTime    @db.Timestamptz(3)
+  // Live, publicly visible while status == active (FR-042).
+  interestCount   Int         @default(0)
+
+  screeningPassed      Boolean
+  screeningRuleVersion String
+  screeningEvaluatedAt DateTime @db.Timestamptz(3)
+
+  moneyPreferenceLabel                MoneyPreferenceLabel?
+  moneyPreferenceNote                 String?
+  moneyPreferenceNoteModerationStatus String?               @default("pending")
+
+  suggestionActivityKey String?
+  suggestionEmoji       String?
+
+  // Self-reference: the offer this one was rebroadcast from, if any (FR-012).
+  rebroadcastOfOfferId String?
+
+  createdAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([status])
+  @@index([creatorUserId])
+}

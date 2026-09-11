@@ -1,0 +1,26 @@
+// Transactional-outbox model fragment (constitution §5). Copy this model into every
+// service's own prisma/schema.prisma — Prisma has no shared-schema import, and a shared
+// physical table would violate the per-service data-ownership rule (constitution §5),
+// so each service owns its own OutboxEvent table instead.
+//
+// Usage: within the same DB transaction that persists a domain state change (e.g. a
+// MeetOffer becoming `active`), also insert the corresponding OutboxEvent row. The
+// OutboxRelay worker (outbox-relay.ts) then reads unpublished rows and calls
+// EventBus.publish, marking them published only after a successful publish.
+
+model OutboxEvent {
+  id             String    @id @default(uuid())
+  eventId        String    @unique
+  eventType      String
+  aggregateId    String
+  aggregateVersion Int
+  correlationId  String
+  causationId    String?
+  producedBy     String
+  schemaVersion  Int
+  data           Json
+  occurredAt     DateTime  @default(now())
+  publishedAt    DateTime?
+
+  @@index([publishedAt])
+}
