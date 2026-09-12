@@ -38,6 +38,8 @@ class AppException implements Exception {
         return l10n.errorNotFound;
       case 'IDEMPOTENCY_KEY_CONFLICT':
         return l10n.errorIdempotencyConflict;
+      case 'NO_PENDING_ID_CASE':
+        return l10n.errorNoPendingIdCase;
       default:
         return l10n.errorUnknown(messageKey);
     }

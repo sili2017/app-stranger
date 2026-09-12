@@ -1,0 +1,349 @@
+version: "3.9"
+
+# Test/staging deployment for a single host (e.g. the existing Windows server via
+# Docker Desktop/WSL2 — no separate cloud spend). Layers on top of the base
+# docker-compose.yml (which already defines the 9 Postgres roles + Redis):
+#
+#   docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.prod.yml \
+#     --env-file infra/docker/.env.prod up -d --build
+#
+# Only the `web` container publishes a port to the host (80). Postgres/Redis ports
+# are rebound to 127.0.0.1-only here (admin/debugging via SSH tunnel, never public),
+# and the 9 domain services + gateway get no host port at all — the browser only
+# ever talks to `web`, which reverse-proxies to them over the internal network (see
+# docker/nginx.conf). Copy .env.prod.example to .env.prod and fill in real values
+# before first run; never commit .env.prod.
+#
+# All 9 Postgres roles share one DB_PASSWORD for simplicity — isolation here comes
+# from separate databases/roles/containers, same as the base file, not from unique
+# per-service passwords. Bump that to per-service secrets before this ever needs to
+# hold real user data.
+
+# Each backend service below sets its own `build.args`, `environment`, and
+# `depends_on` in full (YAML merge keys replace a mapping wholesale, they don't
+# deep-merge) — this anchor only actually contributes `restart:`.
+x-backend-common: &backend-common
+  restart: unless-stopped
+
+services:
+  redis:
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-identity-profile:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U identity_profile"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-offer:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U offer"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-discovery-location:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U discovery_location"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-participation:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U participation"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-messaging:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U messaging"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-trust-safety:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5437:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trust_safety"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-entitlements-billing:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5438:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U entitlements_billing"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-notification:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5439:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notification"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-media:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5440:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U media"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  identity-profile:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: docker/backend.Dockerfile
+      args:
+        SERVICE_NAME: identity-profile
+    environment:
+      PORT: 3001
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://identity_profile:${DB_PASSWORD}@postgres-identity-profile:5432/identity_profile?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres-identity-profile:
+        condition: service_healthy
+
+  offer:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: docker/backend.Dockerfile
+      args:
+        SERVICE_NAME: offer
+    environment:
+      PORT: 3002
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://offer:${DB_PASSWORD}@postgres-offer:5432/offer?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres-offer:
+        condition: service_healthy
+
+  discovery-location:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: docker/backend.Dockerfile
+      args:
+        SERVICE_NAME: discovery-location
+    environment:
+      PORT: 3003
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://discovery_location:${DB_PASSWORD}@postgres-discovery-location:5432/discovery_location?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres-discovery-location:
+        condition: service_healthy
+
+  participation:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: docker/backend.Dockerfile
+      args:
+        SERVICE_NAME: participation
+    environment:
+      PORT: 3004
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://participation:${DB_PASSWORD}@postgres-participation:5432/participation?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres-participation:
+        condition: service_healthy
+
+  messaging:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: docker/backend.Dockerfile
+      args:
+        SERVICE_NAME: messaging
+    environment:
+      PORT: 3005
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://messaging:${DB_PASSWORD}@postgres-messaging:5432/messaging?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres-messaging:
+        condition: service_healthy
+
+  trust-safety:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: docker/backend.Dockerfile
+      args:
+        SERVICE_NAME: trust-safety
+    environment:
+      PORT: 3006
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://trust_safety:${DB_PASSWORD}@postgres-trust-safety:5432/trust_safety?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres-trust-safety:
+        condition: service_healthy
+
+  entitlements-billing:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: docker/backend.Dockerfile
+      args:
+        SERVICE_NAME: entitlements-billing
+    environment:
+      PORT: 3007
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://entitlements_billing:${DB_PASSWORD}@postgres-entitlements-billing:5432/entitlements_billing?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres-entitlements-billing:
+        condition: service_healthy
+
+  notification:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: docker/backend.Dockerfile
+      args:
+        SERVICE_NAME: notification
+    environment:
+      PORT: 3008
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://notification:${DB_PASSWORD}@postgres-notification:5432/notification?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres-notification:
+        condition: service_healthy
+
+  media:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: docker/backend.Dockerfile
+      args:
+        SERVICE_NAME: media
+    environment:
+      PORT: 3009
+      REDIS_URL: redis://redis:6379
+      MEDIA_STORAGE_DIR: /data/media-storage
+      DATABASE_URL: postgresql://media:${DB_PASSWORD}@postgres-media:5432/media?schema=public
+    volumes:
+      - media-storage:/data/media-storage
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres-media:
+        condition: service_healthy
+
+  api-gateway:
+    <<: *backend-common
+    build:
+      context: ../..
+      dockerfile: docker/backend.Dockerfile
+      args:
+        SERVICE_NAME: api-gateway
+    environment:
+      PORT: 3000
+      REDIS_URL: redis://redis:6379
+      # An unset var resolves to "" here, not undefined, which would bypass the
+      # code's own dev-only fallback and sign JWTs with an empty key — default
+      # non-empty even though this whole path is dev-only auth simulation anyway.
+      DEV_OIDC_SECRET: ${DEV_OIDC_SECRET:-dev-only-please-set-a-real-secret}
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../..
+      dockerfile: docker/web.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      identity-profile:
+        condition: service_healthy
+      offer:
+        condition: service_healthy
+      discovery-location:
+        condition: service_healthy
+      participation:
+        condition: service_healthy
+      messaging:
+        condition: service_healthy
+      trust-safety:
+        condition: service_healthy
+      entitlements-billing:
+        condition: service_healthy
+      notification:
+        condition: service_healthy
+      media:
+        condition: service_healthy
+
+volumes:
+  media-storage:

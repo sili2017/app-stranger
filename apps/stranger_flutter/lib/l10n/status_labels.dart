@@ -15,3 +15,19 @@ String offerStatusLabel(AppLocalizations l10n, String status) {
       return status;
   }
 }
+
+/// A glanceable symbol alongside [offerStatusLabel]'s text: a running offer reads as
+/// "live" (🟢), an expired one as "ran out of time" (⏳ — matches the request for an
+/// analog-clock-style cue), and a creator-stopped one as a plain "ended" cross (❌).
+String offerStatusEmoji(String status) {
+  switch (status) {
+    case 'active':
+      return '🟢';
+    case 'expired':
+      return '⏳';
+    case 'stopped':
+      return '❌';
+    default:
+      return '';
+  }
+}

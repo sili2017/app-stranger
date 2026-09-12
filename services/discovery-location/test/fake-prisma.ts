@@ -20,9 +20,15 @@ export class FakePrismaService {
   discoveryEligibility = {
     set: (id: string, row: any) => this.eligibilityRows.set(id, row),
     findMany: async ({ where }: any) => {
-      const cityIds: string[] = where.cityId?.in ?? [];
+      // Mirrors real Prisma semantics: an absent `cityId` key in the where clause means
+      // "no filter on that field" (matches every city), not "match nothing" — the
+      // eligibility.service.ts fallback for a recipient with zero city interests
+      // depends on exactly this (real Postgres already does this correctly; this fake
+      // just needs to not diverge from it).
+      const cityIds: string[] | undefined = where.cityId?.in;
       return [...this.eligibilityRows.values()].filter(
-        (row) => row.status === where.status && cityIds.includes(row.cityId),
+        (row) =>
+          row.status === where.status && (cityIds === undefined || cityIds.includes(row.cityId)),
       );
     },
   };

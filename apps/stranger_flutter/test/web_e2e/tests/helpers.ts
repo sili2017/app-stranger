@@ -174,11 +174,31 @@ export async function signUp(page: Page, name: string): Promise<void> {
   // anyway (its accessible text is "Discover\nTab 1 of 5", so `exact: true` against
   // plain "Discover" never matched it; that assertion only ever passed before because
   // Discover was also the default screen, with its own standalone "Discover" heading).
+  //
+  // Landing on Publish also triggers its one-time location-rationale dialog (shown
+  // once per browser storage, which gotoFresh's localStorage.clear() resets every
+  // time) — a modal dialog excludes the screen behind it from the semantics tree
+  // while shown, which hid "Publish an offer" from the very check below until this
+  // was dismissed first.
+  await dismissLocationRationaleIfShown(page);
   await expect(
     page.getByText('Publish an offer', { exact: true }).first(),
   ).toBeVisible({
     timeout: 15_000,
   });
+}
+
+/** See signUp's note above — best-effort, since the dialog only shows the first time
+ * ever for a given browser storage state. */
+async function dismissLocationRationaleIfShown(page: Page): Promise<void> {
+  const button = page.getByRole('button', { name: 'Sounds good', exact: true });
+  try {
+    await button.waitFor({ state: 'visible', timeout: 3_000 });
+    await button.click({ force: true });
+  } catch {
+    // Never shown this run (already dismissed earlier in this browser context, or
+    // geolocation resolved before the dialog could even appear) — nothing to do.
+  }
 }
 
 /** Polls a locator's bounding box until two consecutive reads match, i.e. it has

@@ -21,6 +21,7 @@ dependencies:
   intl: ^0.20.3 # l10n (T107, FR-040) — version pinned by flutter_localizations SDK
   provider: ^6.1.2 # lightweight app state (current dev user, entitlements)
   shared_preferences: ^2.2.3 # persist the dev user id across refreshes (web-compatible)
+  image_picker: ^1.1.2 # profile/verification photo + government-ID picking; web-compatible via a file input
   stranger_design_system:
     path: ../../packages/dart-design-system
 

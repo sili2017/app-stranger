@@ -70,7 +70,7 @@ describe('Eligibility radius (T054, FR-004)', () => {
     expect(results).toHaveLength(0);
   });
 
-  it('excludes a recipient with no matching city interest even if physically close', async () => {
+  it('excludes a recipient with a city interest registered for a different city, even if physically close', async () => {
     const prisma = buildPrisma();
     prisma.cityInterests.set('recipient-wrong-city', [
       { userId: 'recipient-wrong-city', cityId: 'delhi' },
@@ -87,5 +87,31 @@ describe('Eligibility radius (T054, FR-004)', () => {
     const results = await service.listEligibleForRecipient('recipient-wrong-city');
 
     expect(results).toHaveLength(0);
+  });
+
+  /**
+   * Real gap found via manual testing: a user who never registered any city interest
+   * saw an empty Discover feed forever, even standing right next to an active offer —
+   * city interests were enforced as a strict allow-list instead of the "prioritize
+   * these" preference FR-023 describes. Distinct from the case above (a city interest
+   * registered for the *wrong* city correctly still excludes); this is the *no*
+   * interest registered case, which should now fall through to every active offer.
+   */
+  it('includes a recipient with NO city interest registered at all, when physically close', async () => {
+    const prisma = buildPrisma();
+    // Deliberately not registering any city interest for this recipient.
+    prisma.locations.set('recipient-no-interest', {
+      userId: 'recipient-no-interest',
+      lat: offerLat + 0.003,
+      lng: offerLng + 0.003,
+      source: 'live_gps',
+      capturedAt: new Date(),
+    });
+
+    const service = new EligibilityService(prisma as any);
+    const results = await service.listEligibleForRecipient('recipient-no-interest');
+
+    expect(results).toHaveLength(1);
+    expect(results[0].offerId).toBe('offer-1');
   });
 });

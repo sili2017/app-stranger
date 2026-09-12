@@ -6,8 +6,10 @@ import '../models/profile.dart';
 import '../state/app_state.dart';
 import '../widgets/async_state_views.dart';
 import 'city_interests_screen.dart';
+import 'edit_profile_screen.dart';
 import 'entitlements_screen.dart';
 import 'login_screen.dart';
+import 'verification_screen.dart';
 
 /// FR-013/FR-024: the signed-in user's own Controlled-public profile view — the average
 /// rating and count shown here are exactly what any other user would see, never
@@ -132,11 +134,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 _profile!.publicRatingCount,
                               ),
                       ),
+                      if (_profile!.interests.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: _profile!.interests
+                              .map((i) => Chip(
+                                    label: Text(i),
+                                    visualDensity: VisualDensity.compact,
+                                  ))
+                              .toList(),
+                        ),
+                      ],
                     ],
                   ),
                 ),
               ),
             const SizedBox(height: 24),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: Text(l10n.profileEditProfile),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _profile == null
+                  ? null
+                  : () => Navigator.of(context)
+                      .push(MaterialPageRoute(
+                        builder: (_) => EditProfileScreen(profile: _profile!),
+                      ))
+                      .then((_) => _load()),
+            ),
+            ListTile(
+              leading: const Icon(Icons.verified_user_outlined),
+              title: Text(l10n.profileVerification),
+              subtitle:
+                  _profile == null ? null : Text(_profile!.verificationStatus),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context)
+                  .push(MaterialPageRoute(
+                      builder: (_) => const VerificationScreen()))
+                  .then((_) => _load()),
+            ),
             ListTile(
               leading: const Icon(Icons.location_city_outlined),
               title: Text(l10n.profileCityInterests),

@@ -21,6 +21,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final _userIdController = TextEditingController();
   DateTime? _dateOfBirth;
   bool _submitting = false;
+  // Dev-only: the only way to reach the government-ID verification flow (Profile ->
+  // Verification) is via an account whose signup got flagged, which only ever happens
+  // through a real (unbuilt) liveness check — this simulates that outcome so the flow
+  // is reachable and testable at all in this dev build.
+  bool _simulateFlaggedLiveness = false;
 
   @override
   void dispose() {
@@ -89,8 +94,11 @@ class _LoginScreenState extends State<LoginScreen> {
       final dob = '${_dateOfBirth!.year.toString().padLeft(4, '0')}-'
           '${_dateOfBirth!.month.toString().padLeft(2, '0')}-'
           '${_dateOfBirth!.day.toString().padLeft(2, '0')}';
-      await appState.identity
-          .signupAgeAssurance(dateOfBirth: dob, livenessResult: 'passed');
+      await appState.identity.signupAgeAssurance(
+        dateOfBirth: dob,
+        livenessResult:
+            _simulateFlaggedLiveness ? 'flagged_possible_minor' : 'passed',
+      );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeShell()));
@@ -107,68 +115,97 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
+      // A fixed, center-aligned Column overflowed ("Bottom overflowed by N pixels")
+      // the moment the on-screen keyboard opened on a phone-height viewport — typing
+      // in the name field was enough to trigger it. LayoutBuilder + a
+      // minHeight-constrained, scrollable Column fixes it on every viewport size: tall
+      // screens still look centered (no scrolling needed), short ones scroll instead
+      // of overflowing. This is a general Flutter fix, not a per-device one, so it
+      // holds on phone/tablet/desktop and with any on-screen keyboard alike.
       body: SafeArea(
-        child: ResponsiveCenter(
-          maxWidth: 420,
-          child: Padding(
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
             padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Icon(Icons.handshake_outlined,
-                    size: 56, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(height: 16),
-                Text(
-                  l10n.appTitle,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  l10n.appTagline,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 32),
-                TextField(
-                  controller: _userIdController,
-                  decoration: InputDecoration(
-                    labelText: l10n.loginNameLabel,
-                    border: const OutlineInputBorder(),
+            child: ConstrainedBox(
+              constraints:
+                  BoxConstraints(minHeight: constraints.maxHeight - 48),
+              child: Center(
+                child: ResponsiveCenter(
+                  maxWidth: 420,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Icon(Icons.handshake_outlined,
+                          size: 56,
+                          color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(height: 16),
+                      Text(
+                        l10n.appTitle,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        l10n.appTagline,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 32),
+                      TextField(
+                        controller: _userIdController,
+                        decoration: InputDecoration(
+                          labelText: l10n.loginNameLabel,
+                          border: const OutlineInputBorder(),
+                        ),
+                        textInputAction: TextInputAction.done,
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: _pickDateOfBirth,
+                        icon: const Icon(Icons.cake_outlined),
+                        label: Text(
+                          _dateOfBirth == null
+                              ? l10n.loginSelectDob
+                              : l10n.loginDobLabel(
+                                  '${_dateOfBirth!.year}-${_dateOfBirth!.month.toString().padLeft(2, '0')}-${_dateOfBirth!.day.toString().padLeft(2, '0')}',
+                                ),
+                        ),
+                      ),
+                      CheckboxListTile(
+                        value: _simulateFlaggedLiveness,
+                        onChanged: (v) => setState(
+                            () => _simulateFlaggedLiveness = v ?? false),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(
+                          l10n.loginSimulateFlaggedLiveness,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      FilledButton(
+                        onPressed: _submitting ? null : _continue,
+                        child: _submitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Text(l10n.loginContinue),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        l10n.loginDisclaimer,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
-                  textInputAction: TextInputAction.done,
                 ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: _pickDateOfBirth,
-                  icon: const Icon(Icons.cake_outlined),
-                  label: Text(
-                    _dateOfBirth == null
-                        ? l10n.loginSelectDob
-                        : l10n.loginDobLabel(
-                            '${_dateOfBirth!.year}-${_dateOfBirth!.month.toString().padLeft(2, '0')}-${_dateOfBirth!.day.toString().padLeft(2, '0')}',
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: _submitting ? null : _continue,
-                  child: _submitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(l10n.loginContinue),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  l10n.loginDisclaimer,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
+              ),
             ),
           ),
         ),

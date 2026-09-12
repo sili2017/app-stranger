@@ -10,6 +10,7 @@ import '../services/messaging_api.dart';
 import '../services/trust_safety_api.dart';
 import '../services/entitlements_api.dart';
 import '../services/notifications_api.dart';
+import '../services/media_api.dart';
 
 /// Root app state: the current dev-only session plus one typed API per domain service.
 /// Screens read this via `context.watch<AppState>()` / `context.read<AppState>()` rather
@@ -28,7 +29,8 @@ class AppState extends ChangeNotifier {
         entitlements =
             EntitlementsApi(ApiClient(ApiConfig.entitlementsBilling, session)),
         notifications =
-            NotificationsApi(ApiClient(ApiConfig.notification, session));
+            NotificationsApi(ApiClient(ApiConfig.notification, session)),
+        media = MediaApi(ApiClient(ApiConfig.media, session));
 
   final Session session;
   final IdentityApi identity;
@@ -39,6 +41,7 @@ class AppState extends ChangeNotifier {
   final TrustSafetyApi trustSafety;
   final EntitlementsApi entitlements;
   final NotificationsApi notifications;
+  final MediaApi media;
 
   String? get userId => session.userId;
   bool get isSignedIn => userId != null;
@@ -66,6 +69,13 @@ class AppState extends ChangeNotifier {
 
   Future<void> markPushEnabled() async {
     await session.setPushEnabled(true);
+    notifyListeners();
+  }
+
+  bool get hasSeenLocationRationale => session.hasSeenLocationRationale;
+
+  Future<void> markLocationRationaleSeen() async {
+    await session.setHasSeenLocationRationale();
     notifyListeners();
   }
 }

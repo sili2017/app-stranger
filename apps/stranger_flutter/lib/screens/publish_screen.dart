@@ -4,11 +4,14 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../core/app_exception.dart';
 import '../core/location_service.dart';
+import '../l10n/city_data.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../layout/responsive.dart';
 import '../services/offer_api.dart';
 import '../state/app_state.dart';
+import '../widgets/analog_clock_dial.dart';
 import '../widgets/async_state_views.dart';
+import '../widgets/location_rationale.dart';
 import 'entitlements_screen.dart';
 import 'offer_detail_screen.dart';
 
@@ -59,6 +62,7 @@ class _PublishScreenState extends State<PublishScreen> {
   // come along with it.
   final _activityFocusNode = FocusNode();
   final _cityController = TextEditingController();
+  final _cityFocusNode = FocusNode();
   final _placeLabelController = TextEditingController();
   final _rendezvousController = TextEditingController();
   final _moneyNoteController = TextEditingController();
@@ -79,7 +83,10 @@ class _PublishScreenState extends State<PublishScreen> {
     // before the user touches anything, so publishing is a single flow rather than a
     // "type activity, then remember to also set location and city" chore. Never blocks
     // the form and never overwrites something the user already typed.
-    _prefillFromCurrentLocation();
+    // Deferred to after the first frame — showLocationRationaleOnce calls showDialog,
+    // which Flutter disallows synchronously inside initState.
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _prefillFromCurrentLocation());
   }
 
   @override
@@ -87,6 +94,7 @@ class _PublishScreenState extends State<PublishScreen> {
     _activityController.dispose();
     _activityFocusNode.dispose();
     _cityController.dispose();
+    _cityFocusNode.dispose();
     _placeLabelController.dispose();
     _rendezvousController.dispose();
     _moneyNoteController.dispose();
@@ -94,6 +102,8 @@ class _PublishScreenState extends State<PublishScreen> {
   }
 
   Future<void> _prefillFromCurrentLocation() async {
+    if (mounted) await showLocationRationaleOnce(context);
+    if (!mounted) return;
     final result = await LocationService().getCurrentLocation();
     if (!mounted || result == null) return;
     setState(() {
@@ -138,6 +148,8 @@ class _PublishScreenState extends State<PublishScreen> {
   }
 
   Future<void> _useCurrentLocation() async {
+    await showLocationRationaleOnce(context);
+    if (!mounted) return;
     setState(() => _locating = true);
     final locationService = LocationService();
     final result = await locationService.getCurrentLocation();
@@ -343,15 +355,29 @@ class _PublishScreenState extends State<PublishScreen> {
                 },
               ),
               const SizedBox(height: 12),
-              TextFormField(
-                controller: _cityController,
-                decoration: InputDecoration(
-                  labelText: l10n.publishCityLabel,
-                  border: const OutlineInputBorder(),
-                ),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? l10n.publishRequired
-                    : null,
+              Autocomplete<String>(
+                textEditingController: _cityController,
+                focusNode: _cityFocusNode,
+                optionsBuilder: (value) {
+                  final query = value.text.trim().toLowerCase();
+                  if (query.isEmpty) return const Iterable<String>.empty();
+                  return knownCityIds.where((c) => c.contains(query));
+                },
+                onSelected: (selection) => _cityController.text = selection,
+                fieldViewBuilder:
+                    (context, controller, focusNode, onFieldSubmitted) {
+                  return TextFormField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    decoration: InputDecoration(
+                      labelText: l10n.publishCityLabel,
+                      border: const OutlineInputBorder(),
+                    ),
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? l10n.publishRequired
+                        : null,
+                  );
+                },
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
@@ -452,9 +478,18 @@ class _PublishScreenState extends State<PublishScreen> {
                 ),
               ],
               const SizedBox(height: 20),
-              Text(
-                l10n.publishLifetimeLabel(_lifetimeMinutes),
-                style: Theme.of(context).textTheme.labelLarge,
+              Row(
+                children: [
+                  // The clock face is the primary at-a-glance signal; the text stays
+                  // for accessibility (screen readers, and anyone who just wants the
+                  // number) rather than being replaced outright.
+                  AnalogClockDial(minutes: _lifetimeMinutes),
+                  const SizedBox(width: 8),
+                  Text(
+                    l10n.publishLifetimeLabel(_lifetimeMinutes),
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                ],
               ),
               Slider(
                 value: _lifetimeMinutes.toDouble(),
@@ -468,6 +503,15 @@ class _PublishScreenState extends State<PublishScreen> {
               Text(
                 l10n.publishCapacityLabel(_capacity),
                 style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 2,
+                children: List.generate(
+                  _capacity,
+                  (_) => Icon(Icons.person,
+                      size: 20, color: Theme.of(context).colorScheme.primary),
+                ),
               ),
               Slider(
                 value: _capacity.toDouble(),

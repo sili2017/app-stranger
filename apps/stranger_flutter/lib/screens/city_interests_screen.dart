@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/city_data.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../layout/responsive.dart';
 import '../state/app_state.dart';
 import '../widgets/async_state_views.dart';
 
-/// FR-023: a user may register any number of city interests; discovery only ever
-/// surfaces offers in a registered city (see FeedScreen).
+/// FR-023: a user may register any number of city interests, prioritizing those cities
+/// in Discover. With none registered, every active offer is in play (nearest first) —
+/// see eligibility.service.ts's own note on this fallback, fixed after manual testing
+/// found a fresh account's feed was empty forever with no interest registered.
 class CityInterestsScreen extends StatefulWidget {
   const CityInterestsScreen({super.key});
 
@@ -16,6 +19,10 @@ class CityInterestsScreen extends StatefulWidget {
 
 class _CityInterestsScreenState extends State<CityInterestsScreen> {
   final _newCityController = TextEditingController();
+  // Paired with the Autocomplete below — RawAutocomplete requires focusNode and
+  // textEditingController to be either both supplied or both omitted (see
+  // publish_screen.dart's activity field, which hit this same assertion first).
+  final _newCityFocusNode = FocusNode();
   List<String>? _cities;
   Object? _error;
   bool _busy = false;
@@ -29,6 +36,7 @@ class _CityInterestsScreenState extends State<CityInterestsScreen> {
   @override
   void dispose() {
     _newCityController.dispose();
+    _newCityFocusNode.dispose();
     super.dispose();
   }
 
@@ -87,15 +95,33 @@ class _CityInterestsScreenState extends State<CityInterestsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: _newCityController,
-                      decoration: InputDecoration(
-                        labelText: l10n.cityInterestsIdLabel,
-                        border: const OutlineInputBorder(),
-                      ),
-                      onSubmitted: (_) => _add(),
+                    child: Autocomplete<String>(
+                      textEditingController: _newCityController,
+                      focusNode: _newCityFocusNode,
+                      optionsBuilder: (value) {
+                        final query = value.text.trim().toLowerCase();
+                        if (query.isEmpty) {
+                          return const Iterable<String>.empty();
+                        }
+                        return knownCityIds.where((c) => c.contains(query));
+                      },
+                      onSelected: (selection) =>
+                          _newCityController.text = selection,
+                      fieldViewBuilder:
+                          (context, controller, focusNode, onFieldSubmitted) {
+                        return TextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          decoration: InputDecoration(
+                            labelText: l10n.cityInterestsIdLabel,
+                            border: const OutlineInputBorder(),
+                          ),
+                          onSubmitted: (_) => _add(),
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -117,7 +143,8 @@ class _CityInterestsScreenState extends State<CityInterestsScreen> {
                 ..._cities!.map(
                   (city) => Card(
                     child: ListTile(
-                      leading: const Icon(Icons.location_city),
+                      leading: Text(cityEmoji(city),
+                          style: const TextStyle(fontSize: 24)),
                       title: Text(city),
                       trailing: IconButton(
                         icon: const Icon(Icons.delete_outline),

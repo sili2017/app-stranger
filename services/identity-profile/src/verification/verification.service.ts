@@ -3,7 +3,12 @@ import { DomainError } from '@stranger/ts-platform';
 import { PrismaService } from '../prisma.service';
 import { IdentityEventsProducer } from '../events/identity-events.producer';
 import { AuditLogService } from '../audit/audit-log.service';
-import { SignupAgeAssuranceDto, SubmitGovernmentIdDto, AppealDto } from './dto';
+import {
+  SignupAgeAssuranceDto,
+  SubmitGovernmentIdDto,
+  SubmitPhotoVerificationDto,
+  AppealDto,
+} from './dto';
 
 /**
  * FR-016: self-declared date of birth is checked against the 18+ floor at signup; a
@@ -92,6 +97,36 @@ export class VerificationService {
     // (ADQ-002b, still open). No change to ageAssuranceStatus here.
     void correlationId;
     return { verificationCaseId: pendingCase.id, status: 'submitted' };
+  }
+
+  /**
+   * A voluntary re-verification photo from Profile (distinct from the mandatory
+   * signup liveness check, FR-016) — no real ML/human review pipeline exists (same
+   * simplification `completeSignupAgeAssurance` already makes for its own liveness
+   * result), so this auto-passes and immediately reflects on the public profile.
+   */
+  async submitPhotoVerification(
+    userId: string,
+    dto: SubmitPhotoVerificationDto,
+    correlationId: string,
+  ) {
+    void correlationId;
+    const verificationCase = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.verificationCase.create({
+        data: {
+          userId,
+          kind: 'photo_liveness',
+          status: 'passed',
+          evidenceAssetId: dto.evidenceAssetId,
+        },
+      });
+      await tx.publicProfile.update({
+        where: { userId },
+        data: { verificationStatus: 'photo_verified', photoAssetId: dto.evidenceAssetId },
+      });
+      return created;
+    });
+    return { verificationCaseId: verificationCase.id, status: 'passed' };
   }
 
   /** FR-016 Clarifications: manual appeal for a rejected gov-ID upload or a disputed minor-flag. */

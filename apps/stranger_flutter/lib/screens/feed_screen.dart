@@ -8,6 +8,7 @@ import '../models/offer.dart';
 import '../state/app_state.dart';
 import '../widgets/async_state_views.dart';
 import '../widgets/feed_item_card.dart';
+import '../widgets/location_rationale.dart';
 import 'city_interests_screen.dart';
 import 'notifications_screen.dart';
 import 'offer_detail_screen.dart';
@@ -67,12 +68,15 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Future<void> _refresh({bool silent = false}) async {
     // A silent background poll shouldn't flash the full-page loading state over
-    // whatever the user is currently looking at (or mid-scroll through).
+    // whatever the user is currently looking at (or mid-scroll through) — and
+    // definitely shouldn't pop the rationale dialog over it either.
     if (!silent) {
       setState(() {
         _locating = true;
         _error = null;
       });
+      await showLocationRationaleOnce(context);
+      if (!mounted) return;
     }
 
     final appState = context.read<AppState>();

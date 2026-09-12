@@ -21,6 +21,29 @@ class IdentityApi {
     return PublicProfile.fromJson(json as Map<String, dynamic>);
   }
 
+  Future<PublicProfile> updateProfile(
+    String userId, {
+    String? firstName,
+    List<String>? interests,
+  }) async {
+    final json = await _client.patch('/profiles/$userId', body: {
+      if (firstName != null) 'firstName': firstName,
+      if (interests != null) 'interests': interests,
+    });
+    return PublicProfile.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Auto-passes in this dev build (no real ML/human review pipeline exists yet — see
+  /// verification.service.ts's own note) and immediately updates the profile photo.
+  Future<void> submitPhotoVerification(String evidenceAssetId) => _client
+      .post('/verification/photo', body: {'evidenceAssetId': evidenceAssetId});
+
+  /// Only succeeds when a government-ID case is actually pending (a signup flagged as a
+  /// possible minor) — see verification.service.ts's NO_PENDING_ID_CASE error.
+  Future<void> submitGovernmentId(String evidenceAssetId) =>
+      _client.post('/verification/government-id',
+          body: {'evidenceAssetId': evidenceAssetId});
+
   Future<List<String>> listCityInterests() async {
     final json = await _client.get('/city-interests') as List;
     return json

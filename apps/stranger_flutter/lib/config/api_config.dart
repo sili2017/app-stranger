@@ -37,4 +37,8 @@ class ApiConfig {
     'NOTIFICATION_BASE_URL',
     defaultValue: 'http://localhost:3008',
   );
+  static const String media = String.fromEnvironment(
+    'MEDIA_BASE_URL',
+    defaultValue: 'http://localhost:3009',
+  );
 }

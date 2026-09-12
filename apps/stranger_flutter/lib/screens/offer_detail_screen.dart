@@ -174,7 +174,11 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
         Wrap(
           spacing: 8,
           children: [
-            Chip(label: Text(offerStatusLabel(l10n, offer.status))),
+            Chip(
+              label: Text(
+                '${offerStatusEmoji(offer.status)} ${offerStatusLabel(l10n, offer.status)}',
+              ),
+            ),
             Chip(label: Text(l10n.offerSpots(offer.capacity))),
             Chip(label: Text(l10n.offerInterested(offer.interestCount))),
             if (offer.isActive)

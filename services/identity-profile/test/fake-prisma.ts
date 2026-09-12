@@ -45,6 +45,13 @@ export class FakePrismaService {
       return row;
     },
     findUnique: async ({ where }: any) => this.publicProfiles.get(where.userId) ?? null,
+    update: async ({ where, data }: any) => {
+      const existing = this.publicProfiles.get(where.userId);
+      if (!existing) throw new Error('not found');
+      const updated = { ...existing, ...data };
+      this.publicProfiles.set(where.userId, updated);
+      return updated;
+    },
   };
 
   verificationCase = {

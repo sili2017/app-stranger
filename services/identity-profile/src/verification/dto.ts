@@ -15,6 +15,13 @@ export class SubmitGovernmentIdDto {
   evidenceAssetId!: string;
 }
 
+/** Voluntary re-verification photo (distinct from the mandatory signup liveness check,
+ * which is still just a caller-supplied result — see completeSignupAgeAssurance). */
+export class SubmitPhotoVerificationDto {
+  @IsString()
+  evidenceAssetId!: string;
+}
+
 export class AppealDto {
   @IsString()
   verificationCaseId!: string;

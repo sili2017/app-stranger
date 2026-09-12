@@ -25,3 +25,18 @@ model OutboxEvent {
 
   @@index([publishedAt])
 }
+
+/// T8-followup: backs Identity & Profile's `photoAssetId` / `VerificationCase.
+/// evidenceAssetId` (they reference Media by id only, never store the file — see that
+/// schema's own comments). Dev-only local storage (ADQ-005 is still open); `storageKey`
+/// is the LocalFilesystemStorageAdapter path, never returned to a client directly.
+model Asset {
+  id             String   @id @default(uuid())
+  ownerUserId    String
+  contentType    String
+  byteSize       Int
+  storageKey     String
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([ownerUserId])
+}

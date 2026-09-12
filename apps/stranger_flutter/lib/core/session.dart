@@ -11,6 +11,7 @@ class Session {
   static const _key = 'dev_user_id';
   static const _localeKey = 'language_override';
   static const _pushEnabledKey = 'push_enabled';
+  static const _locationRationaleSeenKey = 'location_rationale_seen';
 
   static Future<Session> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -39,4 +40,13 @@ class Session {
 
   Future<void> setPushEnabled(bool enabled) =>
       _prefs.setBool(_pushEnabledKey, enabled);
+
+  /// Whether the location-permission rationale dialog has already been shown once —
+  /// shown at most once per device so it motivates rather than nags (see
+  /// LocationRationale.showOnce).
+  bool get hasSeenLocationRationale =>
+      _prefs.getBool(_locationRationaleSeenKey) ?? false;
+
+  Future<void> setHasSeenLocationRationale() =>
+      _prefs.setBool(_locationRationaleSeenKey, true);
 }

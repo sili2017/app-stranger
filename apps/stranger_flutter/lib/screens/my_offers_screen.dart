@@ -68,7 +68,7 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
                                         overflow: TextOverflow.ellipsis),
                                     subtitle: Text(
                                       l10n.myOffersSubtitle(
-                                        offerStatusLabel(l10n, o.status),
+                                        '${offerStatusEmoji(o.status)} ${offerStatusLabel(l10n, o.status)}',
                                         o.interestCount,
                                       ),
                                     ),

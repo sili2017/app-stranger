@@ -32,9 +32,12 @@ export class EligibilityService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * T060: recipient is eligible when offer.status == active AND recipient has a
-   * matching CityInterest AND distance(recipient, offer) <= eligibilityRadiusKm[cityId]
-   * (FR-004, resolved via /speckit-clarify).
+   * T060: recipient is eligible when offer.status == active AND
+   * distance(recipient, offer) <= eligibilityRadiusKm[cityId] (FR-004, resolved via
+   * /speckit-clarify). A registered CityInterest narrows this to just those cities —
+   * but only when at least one is registered; with none, every active city is in play
+   * (see the fallback note below listEligibleForRecipient's cityFilter), since FR-023's
+   * point is prioritizing a user's chosen cities, not gatekeeping ones they never chose.
    *
    * T061: ranking prioritizes the recipient's current location (spec.md Clarifications,
    * FR-005, FR-023) — implemented as ascending distance from the recipient's current
@@ -69,14 +72,20 @@ export class EligibilityService {
       where: { userId: recipientUserId },
     });
     const interestedCityIds = new Set(cityInterests.map((c) => c.cityId));
-    if (interestedCityIds.size === 0) {
-      return [];
-    }
+    // Real gap found via manual testing: a user who never registered a city interest
+    // saw an empty feed forever, even standing right next to an active offer — city
+    // interests were being enforced as a strict allow-list rather than the "prioritize
+    // these" preference FR-023 actually describes. With none registered, fall back to
+    // every active offer, still gated by the same per-city radius and still ranked
+    // nearest-first below — a registered interest still matters (it's what lets a
+    // *distant* city's offers appear at all), it just no longer blocks a *nearby* one
+    // with no city interest behind it.
+    const cityFilter = interestedCityIds.size > 0 ? { cityId: { in: [...interestedCityIds] } } : {};
 
     const candidates = await this.prisma.discoveryEligibility.findMany({
       where: {
         status: 'active',
-        cityId: { in: [...interestedCityIds] },
+        ...cityFilter,
         ...(filters.activity
           ? { activityText: { contains: filters.activity, mode: 'insensitive' } }
           : {}),
