@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { EligibilityService } from '../../src/eligibility/eligibility.service';
-import { FakePrismaService } from '../fake-prisma';
+import { FakePrismaService, FakeInternalClients } from '../fake-prisma';
 import { encodeGeohash } from './geohash-test-helper';
 
 /**
@@ -45,7 +45,7 @@ describe('Eligibility radius (T054, FR-004)', () => {
       capturedAt: new Date(),
     });
 
-    const service = new EligibilityService(prisma as any);
+    const service = new EligibilityService(prisma as any, new FakeInternalClients() as any);
     const results = await service.listEligibleForRecipient('recipient-near');
 
     expect(results).toHaveLength(1);
@@ -64,7 +64,7 @@ describe('Eligibility radius (T054, FR-004)', () => {
       capturedAt: new Date(),
     });
 
-    const service = new EligibilityService(prisma as any);
+    const service = new EligibilityService(prisma as any, new FakeInternalClients() as any);
     const results = await service.listEligibleForRecipient('recipient-far');
 
     expect(results).toHaveLength(0);
@@ -83,7 +83,7 @@ describe('Eligibility radius (T054, FR-004)', () => {
       capturedAt: new Date(),
     });
 
-    const service = new EligibilityService(prisma as any);
+    const service = new EligibilityService(prisma as any, new FakeInternalClients() as any);
     const results = await service.listEligibleForRecipient('recipient-wrong-city');
 
     expect(results).toHaveLength(0);
@@ -108,7 +108,7 @@ describe('Eligibility radius (T054, FR-004)', () => {
       capturedAt: new Date(),
     });
 
-    const service = new EligibilityService(prisma as any);
+    const service = new EligibilityService(prisma as any, new FakeInternalClients() as any);
     const results = await service.listEligibleForRecipient('recipient-no-interest');
 
     expect(results).toHaveLength(1);

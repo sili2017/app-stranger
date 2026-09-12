@@ -69,19 +69,26 @@ enum SubscriptionStatus {
   active
   cancelled_pending_period_end
   expired
+  // T124/ADR-009: set by the Stripe webhook on invoice.payment_failed — Stripe retries
+  // automatically, so this is a signal, not necessarily a terminal state.
+  payment_failed
 }
 
 model Subscription {
-  id               String             @id @default(uuid())
-  userId           String
-  plan             SubscriptionPlan
-  status           SubscriptionStatus @default(active)
-  currentPeriodEnd DateTime           @db.Timestamptz(3)
-  basePriceMinor   Int
+  id                   String             @id @default(uuid())
+  userId               String
+  plan                 SubscriptionPlan
+  status               SubscriptionStatus @default(active)
+  currentPeriodEnd     DateTime           @db.Timestamptz(3)
+  basePriceMinor       Int
   // 10 for monthly, 20 for yearly, 0 for weekly (FR-037).
-  discountPct      Int
-  currency         String
-  createdAt        DateTime           @default(now()) @db.Timestamptz(3)
+  discountPct          Int
+  currency             String
+  createdAt            DateTime           @default(now()) @db.Timestamptz(3)
+  // T124/ADR-009: set when created via Stripe — lets the webhook (customer.subscription.
+  // updated/deleted, invoice.payment_failed) find the row Stripe is telling us about.
+  // Null for mock-provider subscriptions, which never get webhook callbacks.
+  stripeSubscriptionId String?            @unique
 
   @@index([userId, status])
 }

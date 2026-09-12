@@ -194,7 +194,15 @@ async function dismissLocationRationaleIfShown(page: Page): Promise<void> {
   const button = page.getByRole('button', { name: 'Sounds good', exact: true });
   try {
     await button.waitFor({ state: 'visible', timeout: 3_000 });
-    await button.click({ force: true });
+    // Convergence T133: this used a bare `.click({force: true})` with no
+    // scroll-into-view step, unlike every other button click in this file
+    // (clickButton). That's exactly the "silent no-op" failure mode this file's own
+    // header comment already documents — it happened to work in Chromium but not in
+    // WebKit, which computes the click's hit-test point differently. Found via the
+    // T133 cross-browser run; fixed by reusing the same robust helper as every other
+    // button here, rather than a second, less-robust click path.
+    await scrollUntilVisible(page, button);
+    await button.click({ force: true, timeout: 5_000 });
   } catch {
     // Never shown this run (already dismissed earlier in this browser context, or
     // geolocation resolved before the dialog could even appear) — nothing to do.

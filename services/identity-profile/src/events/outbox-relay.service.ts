@@ -1,5 +1,5 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { OutboxRelay, RedisEventBus } from '@stranger/ts-platform';
+import { OutboxRelay, createEventBus } from '@stranger/ts-platform';
 import { PrismaOutboxRepository } from './prisma-outbox-repository';
 
 /**
@@ -8,7 +8,7 @@ import { PrismaOutboxRepository } from './prisma-outbox-repository';
  */
 @Injectable()
 export class OutboxRelayService implements OnModuleInit, OnModuleDestroy {
-  private readonly eventBus = new RedisEventBus(process.env.REDIS_URL ?? 'redis://localhost:6379');
+  private readonly eventBus = createEventBus(process.env.REDIS_URL ?? 'redis://localhost:6379', 'identity-profile');
   private relay: OutboxRelay | null = null;
 
   constructor(private readonly repository: PrismaOutboxRepository) {}

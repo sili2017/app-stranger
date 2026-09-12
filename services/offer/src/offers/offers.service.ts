@@ -25,18 +25,48 @@ export class OffersService {
   async publish(creatorUserId: string, dto: PublishOfferDto, correlationId: string) {
     this.validatePlace(dto);
 
+    // Reserve a tentative offer id up front so authorize can be checked against it,
+    // matching contracts/public/offer-service.md's "screen -> authorize -> persist" order.
+    const offerId = randomUUID();
     const screening = await this.internal.screenOffer(dto.activityText);
     if (!screening.passed) {
+      // Convergence T128 (FR-039): persisted (not just rejected in-flight) so there is
+      // a real offerId a creator can appeal against — no entitlement is ever reserved
+      // for a screening-rejected offer. expiresAt == publishedAt is this status's
+      // sentinel for "never went active," avoiding a nullable-expiresAt schema change
+      // that no other status needs.
+      const rejectedAt = new Date();
+      const placeGeohash = encodeGeohash(dto.place.lat, dto.place.lng);
+      await this.prisma.meetOffer.create({
+        data: {
+          id: offerId,
+          creatorUserId,
+          cityId: dto.cityId ?? 'unknown',
+          activityText: dto.activityText,
+          placeKind: dto.place.kind,
+          placeLabel: dto.place.label,
+          placeLat: dto.place.lat,
+          placeLng: dto.place.lng,
+          placeGeohash,
+          rendezvousInstruction: dto.place.rendezvousInstruction,
+          lifetimeMinutes: dto.lifetimeMinutes ?? DEFAULT_LIFETIME_MINUTES,
+          capacity: dto.capacity,
+          status: 'screening_rejected',
+          publishedAt: rejectedAt,
+          expiresAt: rejectedAt,
+          screeningPassed: false,
+          screeningRuleVersion: screening.ruleVersion,
+          screeningEvaluatedAt: new Date(screening.evaluatedAt),
+        },
+      });
       throw new DomainError(
         'CONTENT_SCREENING_FAILED',
         'errors.contentScreeningFailed',
         HttpStatus.UNPROCESSABLE_ENTITY,
+        [{ field: 'offerId', issue: offerId }],
       );
     }
 
-    // Reserve a tentative offer id up front so authorize can be checked against it,
-    // matching contracts/public/offer-service.md's "screen -> authorize -> persist" order.
-    const offerId = randomUUID();
     const authorize = await this.internal.authorizeEntitlement(creatorUserId, offerId);
     if (authorize.decision !== 'granted') {
       throw new DomainError(
@@ -131,6 +161,55 @@ export class OffersService {
       return row;
     });
     return updated;
+  }
+
+  /**
+   * Convergence T135 (FR-039): a successful screening appeal restores the offer as if
+   * freshly published — new publishedAt/expiresAt, re-authorized entitlement (the
+   * original attempt never reserved one, having failed screening first), and a real
+   * offer.published event so Discovery & Location/Notification pick it up normally.
+   * If entitlement authorization fails now (e.g. the allowance was exhausted in the
+   * time since the original attempt), the offer stays screening_rejected — the appeal
+   * decision is still recorded by the caller (T128's ScreeningAppeal), but restoration
+   * is a separate, retriable step, not guaranteed by the decision alone.
+   */
+  async restoreFromScreeningAppeal(offerId: string, correlationId: string): Promise<boolean> {
+    const offer = await this.prisma.meetOffer.findUnique({ where: { id: offerId } });
+    if (!offer || offer.status !== 'screening_rejected') {
+      return false;
+    }
+
+    const authorize = await this.internal.authorizeEntitlement(offer.creatorUserId, offerId);
+    if (authorize.decision !== 'granted') {
+      return false;
+    }
+
+    const publishedAt = new Date();
+    const expiresAt = new Date(publishedAt.getTime() + offer.lifetimeMinutes * 60_000);
+
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.meetOffer.update({
+        where: { id: offerId },
+        data: { status: 'active', publishedAt, expiresAt },
+      });
+      await this.events.offerPublished(
+        tx as unknown as PrismaService,
+        {
+          id: updated.id,
+          creatorUserId: updated.creatorUserId,
+          cityId: updated.cityId,
+          placeGeohash: updated.placeGeohash,
+          placeKind: updated.placeKind,
+          activityText: updated.activityText,
+          lifetimeMinutes: updated.lifetimeMinutes,
+          capacity: updated.capacity,
+          publishedAt: updated.publishedAt,
+          expiresAt: updated.expiresAt,
+        },
+        correlationId,
+      );
+    });
+    return true;
   }
 
   /** T049: interestCount live while active (FR-042). */

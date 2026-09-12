@@ -43,7 +43,13 @@ class Entitlements {
     required this.availableOneTimePurchases,
   });
 
-  final int remainingFreeAllowanceThisMonth;
+  // Convergence T136: the backend deliberately sends `null` here once a subscription
+  // is active — the free-allowance concept doesn't apply while it covers unlimited
+  // publishing (services/entitlements-billing/src/entitlements.service.ts). This was
+  // a non-nullable `int` cast, so the Entitlements screen crashed outright for any
+  // subscribed user — a real, previously-undiscovered bug found by finally exercising
+  // the subscribe flow end-to-end (T136's E2E test).
+  final int? remainingFreeAllowanceThisMonth;
   final bool hasActiveSubscription;
   final String? subscriptionPlan;
   final String? subscriptionStatus;
@@ -51,14 +57,14 @@ class Entitlements {
 
   bool get canPublish =>
       hasActiveSubscription ||
-      remainingFreeAllowanceThisMonth > 0 ||
+      (remainingFreeAllowanceThisMonth ?? 0) > 0 ||
       availableOneTimePurchases > 0;
 
   factory Entitlements.fromJson(Map<String, dynamic> json) {
     final subscription = json['subscription'] as Map<String, dynamic>?;
     return Entitlements(
       remainingFreeAllowanceThisMonth:
-          json['remainingFreeAllowanceThisMonth'] as int,
+          json['remainingFreeAllowanceThisMonth'] as int?,
       hasActiveSubscription: json['hasActiveSubscription'] as bool,
       subscriptionPlan: subscription?['plan'] as String?,
       subscriptionStatus: subscription?['status'] as String?,

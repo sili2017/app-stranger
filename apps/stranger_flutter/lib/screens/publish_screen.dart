@@ -491,13 +491,21 @@ class _PublishScreenState extends State<PublishScreen> {
                   ),
                 ],
               ),
-              Slider(
-                value: _lifetimeMinutes.toDouble(),
-                min: 5,
-                max: 30,
-                divisions: 25,
-                label: '$_lifetimeMinutes',
-                onChanged: (v) => setState(() => _lifetimeMinutes = v.round()),
+              // Convergence T134 (ADQ-008, WCAG 2.1 AA): axe-core flagged this Slider
+              // as having no accessible name — its own `label:` is only a drag-time
+              // value tooltip, not a name describing what the control does. Reuses
+              // the exact text already shown above it, so there's no new copy to
+              // localize.
+              Semantics(
+                label: l10n.publishLifetimeLabel(_lifetimeMinutes),
+                child: Slider(
+                  value: _lifetimeMinutes.toDouble(),
+                  min: 5,
+                  max: 30,
+                  divisions: 25,
+                  label: '$_lifetimeMinutes',
+                  onChanged: (v) => setState(() => _lifetimeMinutes = v.round()),
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -513,13 +521,16 @@ class _PublishScreenState extends State<PublishScreen> {
                       size: 20, color: Theme.of(context).colorScheme.primary),
                 ),
               ),
-              Slider(
-                value: _capacity.toDouble(),
-                min: 1,
-                max: 10,
-                divisions: 9,
-                label: '$_capacity',
-                onChanged: (v) => setState(() => _capacity = v.round()),
+              Semantics(
+                label: l10n.publishCapacityLabel(_capacity),
+                child: Slider(
+                  value: _capacity.toDouble(),
+                  min: 1,
+                  max: 10,
+                  divisions: 9,
+                  label: '$_capacity',
+                  onChanged: (v) => setState(() => _capacity = v.round()),
+                ),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(

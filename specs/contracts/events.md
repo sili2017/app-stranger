@@ -1,6 +1,6 @@
 # Domain Event Contracts: Ephemeral Stranger Meet Offers
 
-Transport: durable event bus (vendor TBD, `research.md` §5), transactional outbox at the publisher, idempotent consumers at every subscriber (constitution §5). Every event shares this envelope:
+Transport: self-hosted Kafka (resolved 2026-09-12 via `/speckit-clarify`, ADQ-001, `research.md` §5, `docs/architecture/decisions.md` ADR-008 — the current implementation still targets a dev-only Redis-based pub/sub substitute pending migration), transactional outbox at the publisher, idempotent consumers at every subscriber (constitution §5). Every event shares this envelope:
 
 ```json
 {

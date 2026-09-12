@@ -3,10 +3,10 @@ import * as path from 'path';
 import { StorageAdapter } from './storage-adapter.interface';
 
 /**
- * [BLOCKED: ADQ-005] Local dev-only implementation of StorageAdapter, standing in for
- * the eventual S3-compatible provider (research.md §6). Every domain service and the
- * Media service's own endpoints depend only on StorageAdapter, never on this class, so
- * swapping in the approved provider is a single binding change (constitution §5).
+ * ADQ-005 (resolved: AWS S3): dev-only fallback implementation of StorageAdapter, used
+ * by storage-adapter-factory.ts whenever `STORAGE_DRIVER` isn't `s3`. Every domain
+ * service and the Media service's own endpoints depend only on StorageAdapter, never on
+ * this class directly, so it stays swappable via the factory alone.
  *
  * MUST NOT be used in production: no encryption-at-rest, no access audit, no regional
  * residency control — the properties research.md §6 requires of the real provider.

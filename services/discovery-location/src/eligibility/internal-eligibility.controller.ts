@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { EligibilityService } from './eligibility.service';
 
 /**
@@ -18,5 +18,12 @@ export class InternalEligibilityController {
   ) {
     const eligible = await this.eligibility.isEligible(recipientUserId, offerId);
     return { eligible };
+  }
+
+  /** Convergence T125 (FR-006): consumed by Notification's offer.published fan-out. */
+  @Get('offers/:offerId/eligible-recipients')
+  async eligibleRecipients(@Param('offerId') offerId: string) {
+    const recipientUserIds = await this.eligibility.listEligibleRecipientsForOffer(offerId);
+    return { recipientUserIds };
   }
 }

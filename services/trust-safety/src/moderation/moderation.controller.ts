@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { ModerationService } from './moderation.service';
@@ -7,6 +7,7 @@ import {
   CreateReportDto,
   ModerationDecisionDto,
   ScreeningOverrideDto,
+  SubmitScreeningAppealDto,
 } from './dto';
 
 function principal(req: Request) {
@@ -55,6 +56,39 @@ export class ModerationDecisionsController {
   @HttpCode(200)
   async decide(@Body() dto: ModerationDecisionDto, @Req() req: Request) {
     return this.moderation.decide(principal(req), dto, correlation(req));
+  }
+}
+
+/**
+ * Convergence T128 (FR-039): a creator's self-service appeal of an automated
+ * screening rejection, mirroring Identity & Profile's verification appeal shape.
+ */
+@Controller('offers')
+export class ScreeningAppealsController {
+  constructor(private readonly moderation: ModerationService) {}
+
+  @Post(':offerId/screening-appeal')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @HttpCode(201)
+  async submit(
+    @Param('offerId') offerId: string,
+    @Body() dto: SubmitScreeningAppealDto,
+    @Req() req: Request,
+  ) {
+    return this.moderation.submitScreeningAppeal(principal(req), offerId, dto.reason);
+  }
+}
+
+/** Convergence T126 (FR-015): the block-enforcement check called by Discovery & Location,
+ * Participation, and Messaging before showing/allowing contact between two users. */
+@Controller('internal/v1/trust-safety/blocks')
+export class InternalBlocksController {
+  constructor(private readonly moderation: ModerationService) {}
+
+  @Get('check')
+  async check(@Query('userId') userId: string, @Query('otherUserId') otherUserId: string) {
+    const blocked = await this.moderation.isBlocked(userId, otherUserId);
+    return { blocked };
   }
 }
 

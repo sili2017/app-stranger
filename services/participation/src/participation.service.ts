@@ -87,6 +87,13 @@ export class ParticipationService {
       return eoi.selection;
     }
 
+    // Convergence T126 (FR-015): a block since the expression of interest was
+    // submitted (in either direction) blocks a new selection, even though the EOI
+    // itself already exists.
+    if (await this.internal.isBlocked(callerUserId, eoi.recipientUserId)) {
+      throw new DomainError('NOT_ELIGIBLE', 'errors.notEligible', HttpStatus.FORBIDDEN);
+    }
+
     const activeSelectionCount = await this.prisma.selection.count({
       where: { offerId, outcome: { not: 'cancelled' } },
     });

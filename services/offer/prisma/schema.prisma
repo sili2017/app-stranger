@@ -39,6 +39,11 @@ enum OfferStatus {
   active
   expired
   stopped
+  /// Convergence T128 (FR-039): automated screening rejected this offer at publish
+  /// time; it never went active. Appealable via Trust & Safety's screening-appeal
+  /// endpoint; restored to `active` (fresh publishedAt/expiresAt) if the appeal
+  /// succeeds (T135's trust.moderation-decisioned consumer).
+  screening_rejected
 }
 
 enum MoneyPreferenceLabel {

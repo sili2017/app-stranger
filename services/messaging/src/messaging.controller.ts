@@ -4,6 +4,7 @@ import { Request } from 'express';
 import { DomainError } from '@stranger/ts-platform';
 import { PrismaService } from './prisma.service';
 import { SendMessageDto } from './dto';
+import { InternalClients } from './internal-clients';
 
 function principal(req: Request) {
   return (req as any).verifiedPrincipal?.userId as string;
@@ -11,7 +12,10 @@ function principal(req: Request) {
 
 @Controller()
 export class MessagingController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly internal: InternalClients,
+  ) {}
 
   /** T078: only conversations the caller is a member of. */
   @Get('conversations')
@@ -40,6 +44,19 @@ export class MessagingController {
     if (chat.status !== 'active') {
       throw new DomainError('CHAT_NOT_ACTIVE', 'errors.chatNotActive', HttpStatus.CONFLICT);
     }
+
+    // Convergence T126 (FR-015): a block against any other current member blocks a new
+    // send — this gates new contact, not historical message visibility (undefined by
+    // spec.md for a shared group chat; left as a documented remaining nuance).
+    const otherMembers = await this.prisma.chatMembership.findMany({
+      where: { chatId, userId: { not: senderId } },
+    });
+    for (const member of otherMembers) {
+      if (await this.internal.isBlocked(senderId, member.userId)) {
+        throw new DomainError('BLOCKED', 'errors.blocked', HttpStatus.FORBIDDEN);
+      }
+    }
+
     return this.prisma.message.create({ data: { chatId, senderId, body: dto.body } });
   }
 

@@ -11,6 +11,7 @@ export class FakePrismaService {
 
   locationSnapshot = {
     findUnique: async ({ where }: any) => this.locations.get(where.userId) ?? null,
+    findMany: async () => [...this.locations.values()],
   };
 
   cityInterest = {
@@ -19,6 +20,7 @@ export class FakePrismaService {
 
   discoveryEligibility = {
     set: (id: string, row: any) => this.eligibilityRows.set(id, row),
+    findUnique: async ({ where }: any) => this.eligibilityRows.get(where.offerId) ?? null,
     findMany: async ({ where }: any) => {
       // Mirrors real Prisma semantics: an absent `cityId` key in the where clause means
       // "no filter on that field" (matches every city), not "match nothing" — the
@@ -32,4 +34,13 @@ export class FakePrismaService {
       );
     },
   };
+}
+
+/** Fake for the Convergence T126 block-enforcement client — no blocks by default. */
+export class FakeInternalClients {
+  blockedPairs = new Set<string>();
+
+  async isBlocked(userId: string, otherUserId: string): Promise<boolean> {
+    return this.blockedPairs.has(`${userId}:${otherUserId}`);
+  }
 }

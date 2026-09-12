@@ -21,6 +21,7 @@ describe('Partial selection (T068, FR-008, FR-042)', () => {
         creatorUserId: 'creator-1',
       }),
       isEligibleRecipient: async () => true,
+      isBlocked: async () => false,
     };
     const service = new ParticipationService(prisma as any, events, internal as any);
     return { service, prisma };

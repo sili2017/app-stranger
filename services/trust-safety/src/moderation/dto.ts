@@ -39,3 +39,10 @@ export class ScreeningOverrideDto {
   @IsString()
   reason?: string;
 }
+
+/** Convergence T128 (FR-039): a creator's self-service appeal of a screening rejection. */
+export class SubmitScreeningAppealDto {
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}

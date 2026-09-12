@@ -6,12 +6,21 @@ export class InternalClients {
   private readonly offerBaseUrl = process.env.OFFER_BASE_URL ?? 'http://localhost:3002';
   private readonly participationBaseUrl =
     process.env.PARTICIPATION_BASE_URL ?? 'http://localhost:3004';
+  private readonly discoveryBaseUrl = process.env.DISCOVERY_BASE_URL ?? 'http://localhost:3003';
 
   async getOfferCreator(offerId: string): Promise<string | null> {
     const body = (await this.getWithTimeout(
       `${this.offerBaseUrl}/internal/v1/offers/${offerId}/status`,
     )) as { creatorUserId?: string };
     return body?.creatorUserId ?? null;
+  }
+
+  /** Convergence T125 (FR-006): recipients eligible for a just-published offer. */
+  async getEligibleRecipients(offerId: string): Promise<string[]> {
+    const body = (await this.getWithTimeout(
+      `${this.discoveryBaseUrl}/internal/v1/discovery/offers/${offerId}/eligible-recipients`,
+    )) as { recipientUserIds?: string[] };
+    return body?.recipientUserIds ?? [];
   }
 
   async getSelectionRecipient(selectionId: string): Promise<string | null> {

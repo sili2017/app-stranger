@@ -20,7 +20,13 @@ export class SubscriptionsController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @HttpCode(201)
   async create(@Body() dto: CreateSubscriptionDto, @Req() req: Request) {
-    return this.subscriptions.create(principal(req), dto.plan, dto.receiptToken, correlation(req));
+    return this.subscriptions.create(
+      principal(req),
+      dto.plan,
+      dto.receiptToken,
+      correlation(req),
+      dto.stripeSubscriptionId,
+    );
   }
 
   @Post(':id/cancel')

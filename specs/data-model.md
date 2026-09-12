@@ -113,7 +113,7 @@ Split into four sub-entities (refined from an earlier single flat `User` entity)
 
 ### Message
 - `id`, `chatId`, `senderUserId`, `body`, `sentAt`
-- Retention/moderation rules: **NEEDS CLARIFICATION** (spec Open Question 9)
+- **Retention, resolved 2026-09-12** (spec.md FR-038, Clarifications Session 2026-09-12 round 2): a `Chat` and its `Message` rows are retained for 12 months after `status` becomes `archived_readonly`, then auto-deleted/anonymized, except under an active legal or safety hold. **Not yet implemented** — no purge job exists.
 
 ## Trust & Safety service
 
@@ -124,18 +124,21 @@ Split into four sub-entities (refined from an earlier single flat `User` entity)
 ### Report
 - `id`, `reporterUserId`, `subjectType`: `user | offer | message | rating_feedback | photo`, `subjectId`, `status`, `createdAt`
 - Never exposed to any user as profile information (constitution §3.V).
+- **Retention, resolved 2026-09-12** (spec.md FR-015, Clarifications Session 2026-09-12 round 2): retained for 12 months after `status` resolves (closed/enforced/rejected), then auto-deleted/anonymized, except under an active legal or safety hold. Applies identically to `ModerationCase`. **Not yet implemented** — no purge job exists.
 
 ### RatingFeedback
 - `id`, `offerId`, `selectionId`, `raterUserId`, `rateeUserId`
-- `starRating` (scale **NEEDS CLARIFICATION**, spec Open Question 15)
+- `starRating` (1-5 integer scale — already implemented as such in `services/trust-safety/src/rating/dto.ts`/schema and the Flutter `rate_meetup_sheet.dart`; this doc previously flagged it NEEDS CLARIFICATION by mistake, corrected 2026-09-12.)
 - `writtenFeedback`
 - `photoUrl?`, `photoConsent`: `{ subjectUserId, consentedAt }[]` — a photo showing an identifiable other person is not made public until every such consent row exists (FR-029)
 - `visibility`: `pending_followup` | `public` | `removed`
+- **Visibility rule, resolved 2026-09-12** (spec.md FR-029, Clarifications Session 2026-09-12 round 2): becomes `public` immediately once both parties for a `selectionId` have submitted a rating (still subject to the photo-consent gate above); if only one party has rated, it stays `pending_followup` for up to a 5-day SLA, after which it becomes `public` on its own even with no counterpart rating. **Not yet implemented** — the current `rating.service.ts` only checks photo-consent, never the counterpart's rating or a 5-day timer; this needs a new scheduled job (same pattern as `promptSentAt`'s 2-hour delayed job) plus a counterpart-rating check on each submission.
 - `promptSentAt` — set by an asynchronous delayed job triggered by `participation.selection-resolved` once `outcome == happened`, scheduled exactly 2 hours after that event (resolved via `/speckit-clarify`, spec.md FR-029).
 - Eligibility precondition: created only when `Selection.outcome == happened`.
 
 ### TrustedContactSetting
-- `id`, `userId`, `contactHandleEncrypted` (encrypted at rest; Highly Restricted — never returned in a list/discovery response, constitution §7), `sharingRule` — journey/turnaround details **NEEDS CLARIFICATION** (spec Open Question 9).
+- `id`, `userId`, `contactHandleEncrypted` (encrypted at rest; Highly Restricted — never returned in a list/discovery response, constitution §7)
+- **Sharing behavior, resolved 2026-09-12** (spec.md FR-015, Clarifications Session 2026-09-12 round 2): a manual, one-tap "share my current meetup" action — not automatic or continuous — sends the stored contact the active offer's activity/place/time once, on request. **Not yet implemented**: today this entity only stores the setting; no share action, no `sharingRule` field, and no emergency-guidance screen (a static, always-accessible safety-tips screen, unrelated to this entity) exist anywhere in the codebase.
 
 ## Entitlements & Billing service
 
@@ -191,9 +194,9 @@ Classifies every field above so a reviewer can check a new field's handling at a
 
 Before any of these entities gets a physical migration, the linked approval must close (all tracked centrally in `docs/architecture/decisions.md`, not duplicated here):
 
-1. `UserAccount`/`VerificationCase` — needs ADQ-002a (auth provider) and ADQ-002b (re-verification/launch countries).
+1. `UserAccount`/`VerificationCase` — ADQ-002a (auth provider) is resolved (managed OIDC-as-a-service, ADR-007) but the vendor migration itself hasn't happened — these tables were physically migrated under the dev-only `x-dev-user-id` stand-in ahead of that gate closing; still needs ADQ-002b (re-verification/launch countries).
 2. `PublishingEntitlementLedger`/`RegisteredAddress.calendarTimezone` — offer-counting rule is resolved (every publish counts, no refund on stop/expire, rebroadcast counts again); still needs the city→timezone mapping (spec Open Question 18).
-3. `RatingFeedback`/`MediaAsset` (feedback photo path) — needs ADQ-006 (moderation/trust operating model) and the consent-capture flow (spec Open Question 16).
+3. `RatingFeedback`/`MediaAsset` (feedback photo path) — the consent-capture flow is implemented (`POST /ratings/:id/photo-consent`); ADQ-006's remaining gap is a user-facing appeal path for a falsely-screened-and-rejected offer, not this entity.
 4. `Message`/`Chat` retention fields — needs the retention/legal-hold answer under spec Open Question 9.
 
 ## Post-Design Constitution Re-Check
@@ -201,4 +204,4 @@ Before any of these entities gets a physical migration, the linked approval must
 - No shared database or cross-service foreign key was introduced — every cross-service link above is an id reference resolved via an event or a synchronous authorization call, matching constitution §5.
 - No client-facing field, and no domain event, exposes precise location before selection; `DiscoveryEligibility.distanceBand` (client-facing) and `placeGeohash` (event-facing) are the only location data that ever leaves Offer pre-selection, satisfying §3.IV. This was tightened during review: the first draft of `offer.published` carried exact `lat`/`lng` to every consumer including Notification — corrected in `contracts/events.md`.
 - Sensitive fields (`ageAssuranceStatus` detail, `MediaAsset.storageRef`, payment identifiers, `TrustedContactSetting.contactHandleEncrypted`) stay inside their owning service and are never copied into a cross-service read model or event payload, satisfying §7's least-privilege rule — see the Sensitive-Data Classification table above.
-- All `NEEDS CLARIFICATION` markers remaining in this data model are traceable to an already-open spec Open Question or an ADQ in `docs/architecture/decisions.md` — none is a new ambiguity introduced by this design pass. **Result: PASS** (no new Constitution Check violation from Phase 1 design; existing BLOCKED/OPEN gates in `plan.md` are unchanged and still gate `/speckit-tasks`, not this design).
+- All `NEEDS CLARIFICATION` markers remaining in this data model are traceable to an already-open spec Open Question or an ADQ in `docs/architecture/decisions.md` — none is a new ambiguity introduced by this design pass. **Result: PASS** (no new Constitution Check violation from Phase 1 design). **Updated 2026-09-12**: five of `plan.md`'s Constitution Check gates (auth, event transport, payments, storage, browser/accessibility) moved from BLOCKED/OPEN to PARTIAL via `/speckit-clarify` — see `plan.md`'s Constitution Check table for current status; the remaining gaps are narrower (vendor picks, pricing specifics, and two deferred product/compliance decisions) but still gate `/speckit-tasks` for the behaviors they cover, per constitution §9.

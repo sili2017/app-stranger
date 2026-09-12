@@ -56,7 +56,17 @@ export class FakePrismaService {
       matches.sort((a, b) => b.currentPeriodEnd.getTime() - a.currentPeriodEnd.getTime());
       return matches[0] ?? null;
     },
-    findUnique: async ({ where }: any) => this.subscriptions.get(where.id) ?? null,
+    findUnique: async ({ where }: any) => {
+      if (where.id) return this.subscriptions.get(where.id) ?? null;
+      if (where.stripeSubscriptionId) {
+        return (
+          [...this.subscriptions.values()].find(
+            (s) => s.stripeSubscriptionId === where.stripeSubscriptionId,
+          ) ?? null
+        );
+      }
+      return null;
+    },
     update: async ({ where, data }: any) => {
       const row = { ...this.subscriptions.get(where.id), ...data };
       this.subscriptions.set(where.id, row);

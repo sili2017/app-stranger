@@ -1,23 +1,20 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import Redis from 'ioredis';
-import { DomainEvent, EventIdempotencyGuard, RedisEventBus } from '@stranger/ts-platform';
+import { DomainEvent, EventIdempotencyGuard, createEventBus } from '@stranger/ts-platform';
 import { NotificationService } from './notification.service';
 import { InternalClients } from './internal-clients';
 
 const CONSUMER_NAME = 'notification';
 
 /**
- * T108: dispatches notifications for the events that already carry (or can cheaply
- * resolve) a concrete recipient. **Known gap**: this does NOT include "a new offer was
- * published near you" — proactively fanning that out to every eligible recipient within
- * ~30 seconds (FR-006) requires a background job that scans Discovery & Location's
- * eligibility read model on every offer.published event, which is not built. Recipients
- * currently only see a new offer by pulling `GET /discovery/feed` themselves.
+ * T108, extended by Convergence T125: dispatches notifications for events that carry
+ * (or can cheaply resolve) a concrete recipient, including the FR-006 "a new offer is
+ * nearby" fan-out on offer.published.
  */
 @Injectable()
 export class EventConsumersService implements OnModuleInit {
   private readonly redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
-  private readonly eventBus = new RedisEventBus(this.redisUrl);
+  private readonly eventBus = createEventBus(this.redisUrl, 'notification');
   private readonly idempotency = new EventIdempotencyGuard(new Redis(this.redisUrl));
 
   constructor(
@@ -48,6 +45,9 @@ export class EventConsumersService implements OnModuleInit {
     await this.eventBus.subscribe<Record<string, unknown>>(
       'billing.one-time-broadcast-granted',
       (e) => this.guarded(e, () => this.onOneTimeBroadcastGranted(e)),
+    );
+    await this.eventBus.subscribe<Record<string, unknown>>('offer.published', (e) =>
+      this.guarded(e, () => this.onOfferPublished(e)),
     );
   }
 
@@ -127,5 +127,33 @@ export class EventConsumersService implements OnModuleInit {
   private async onOneTimeBroadcastGranted(event: DomainEvent): Promise<void> {
     const d = event.data as Record<string, unknown>;
     await this.notifications.queue(String(d.userId), 'billing.one-time-broadcast-granted', d);
+  }
+
+  /**
+   * Convergence T125 (FR-006): fan out "a new offer is nearby" to every eligible
+   * recipient within ~30 seconds of publish. Discovery & Location consumes this same
+   * offer.published event independently to build the read model this call depends on
+   * (contracts/events.md lists both as consumers) — there is no ordering guarantee
+   * between two independent consumers of one event, so this retries briefly rather than
+   * assuming Discovery has already finished (ADR-003: consumers must tolerate delay).
+   */
+  private async onOfferPublished(event: DomainEvent): Promise<void> {
+    const d = event.data as Record<string, unknown>;
+    const offerId = String(d.offerId);
+
+    let recipientUserIds: string[] = [];
+    for (let attempt = 0; attempt < 4; attempt++) {
+      recipientUserIds = await this.internal.getEligibleRecipients(offerId);
+      if (recipientUserIds.length > 0) break;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
+    for (const recipientUserId of recipientUserIds) {
+      await this.notifications.queue(recipientUserId, 'offer.published-nearby', {
+        offerId,
+        activityText: d.activityText,
+        cityId: d.cityId,
+      });
+    }
   }
 }

@@ -1,18 +1,14 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { DomainError } from '@stranger/ts-platform';
 import { PrismaService } from '../prisma.service';
-import { LocalFilesystemStorageAdapter } from '../storage/local-filesystem-storage.adapter';
+import { createStorageAdapter } from '../storage/storage-adapter-factory';
 import { UploadAssetDto } from './dto';
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB — generous for a phone photo or a scanned ID page
 
 @Injectable()
 export class AssetsService {
-  // [BLOCKED: ADQ-005] local filesystem, matching the storage adapter's own module doc —
-  // swap the adapter binding, not this service, once a real provider is approved.
-  private readonly storage = new LocalFilesystemStorageAdapter(
-    process.env.MEDIA_STORAGE_DIR ?? '.tooling/media-storage',
-  );
+  private readonly storage = createStorageAdapter();
 
   constructor(private readonly prisma: PrismaService) {}
 

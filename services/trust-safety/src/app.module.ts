@@ -7,6 +7,8 @@ import { PrismaOutboxRepository } from './events/prisma-outbox-repository';
 import { OutboxRelayService } from './events/outbox-relay.service';
 import { RatingEligibilityConsumer } from './rating/rating-eligibility.consumer';
 import { RatingPromptScheduler } from './rating/rating-prompt-scheduler';
+import { RatingVisibilitySlaScheduler } from './rating/rating-visibility-sla-scheduler';
+import { ReportRetentionScheduler } from './moderation/report-retention-scheduler';
 import { InternalClients } from './rating/internal-clients';
 import { RatingService } from './rating/rating.service';
 import { RatingsController } from './rating/ratings.controller';
@@ -17,6 +19,8 @@ import {
   ReportsController,
   ModerationDecisionsController,
   ScreeningOverridesController,
+  InternalBlocksController,
+  ScreeningAppealsController,
 } from './moderation/moderation.controller';
 import { TrustedContactsController } from './trusted-contacts/trusted-contacts.controller';
 
@@ -29,6 +33,8 @@ import { TrustedContactsController } from './trusted-contacts/trusted-contacts.c
     ReportsController,
     ModerationDecisionsController,
     ScreeningOverridesController,
+    InternalBlocksController,
+    ScreeningAppealsController,
     TrustedContactsController,
   ],
   providers: [
@@ -38,6 +44,8 @@ import { TrustedContactsController } from './trusted-contacts/trusted-contacts.c
     OutboxRelayService,
     RatingEligibilityConsumer,
     RatingPromptScheduler,
+    RatingVisibilitySlaScheduler,
+    ReportRetentionScheduler,
     InternalClients,
     RatingService,
     AuditLogService,

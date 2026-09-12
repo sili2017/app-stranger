@@ -9,6 +9,7 @@ import 'city_interests_screen.dart';
 import 'edit_profile_screen.dart';
 import 'entitlements_screen.dart';
 import 'login_screen.dart';
+import 'safety_screen.dart';
 import 'verification_screen.dart';
 
 /// FR-013/FR-024: the signed-in user's own Controlled-public profile view — the average
@@ -189,6 +190,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const EntitlementsScreen()),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.shield_outlined),
+              title: Text(l10n.profileSafety),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SafetyScreen()),
               ),
             ),
             ListTile(

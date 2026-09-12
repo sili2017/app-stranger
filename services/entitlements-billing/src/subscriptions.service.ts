@@ -2,7 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { DomainError } from '@stranger/ts-platform';
 import { PrismaService } from './prisma.service';
 import { BillingEventsProducer } from './events/billing-events.producer';
-import { MockPaymentVerifier } from './payment-webhook/mock-payment-verifier';
+import { createPaymentVerifier } from './payment-webhook/payment-provider-factory';
 import {
   discountedPriceMinor,
   periodLengthMs,
@@ -12,7 +12,7 @@ import {
 
 @Injectable()
 export class SubscriptionsService {
-  private readonly verifier = new MockPaymentVerifier();
+  private readonly verifier = createPaymentVerifier();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -25,6 +25,10 @@ export class SubscriptionsService {
     plan: 'weekly' | 'monthly' | 'yearly',
     receiptToken: string,
     correlationId: string,
+    // T124/ADR-009: Stripe's own subscription id (from the Checkout Session the client
+    // completed), so the webhook can later match customer.subscription.* events back
+    // to this row. Undefined for the mock provider, which never gets webhook callbacks.
+    stripeSubscriptionId?: string,
   ) {
     const verification = await this.verifier.verifyReceipt(receiptToken);
     if (!verification.valid) {
@@ -46,6 +50,7 @@ export class SubscriptionsService {
           basePriceMinor: SUBSCRIPTION_BASE_PRICE_MINOR[plan],
           discountPct: plan === 'monthly' ? 10 : plan === 'yearly' ? 20 : 0,
           currency: REFERENCE_CURRENCY,
+          stripeSubscriptionId: stripeSubscriptionId ?? null,
         },
       });
       await this.events.subscriptionChanged(

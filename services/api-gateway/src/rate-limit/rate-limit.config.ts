@@ -7,9 +7,8 @@
  * this is the source-of-truth ledger for cross-service consistency, not (yet) a second
  * enforcement point.
  *
- * All values below are provisional defaults sized for a v1 launch, not the product of
- * an approved abuse-threshold policy (plan.md Security and Privacy Architecture) —
- * flagged per-row where a specific NEEDS CLARIFICATION exists in a contract file.
+ * All values below were approved as the v1 launch policy 2026-09-12 via `/speckit-clarify`
+ * (plan.md Security and Privacy Architecture) — no longer provisional.
  */
 export interface RateLimitRule {
   ttlSeconds: number;
@@ -30,8 +29,7 @@ export const RATE_LIMIT_RULES: Record<string, RateLimitRule> = {
   // Offer
   'POST /api/v1/offers': {
     ttlSeconds: 60,
-    // NEEDS CLARIFICATION (contracts/public/offer-service.md): exact threshold pending
-    // abuse-threshold policy. Provisional value only.
+    // Approved v1 launch policy (contracts/public/offer-service.md, 2026-09-12).
     limit: 5,
   },
   'POST /api/v1/offers/{id}/stop': { ttlSeconds: 60, limit: 20 },

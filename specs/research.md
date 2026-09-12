@@ -31,17 +31,17 @@ Format per topic: Decision / Rationale / Alternatives considered.
 
 ## 5. Durable event bus
 
-- **Decision**: A managed, cloud-provider message broker with at-least-once delivery and per-topic ordering (e.g., the managed broker of whichever cloud the platform team ultimately hosts on) is recommended over self-hosting Kafka/RabbitMQ for v1, paired with the transactional-outbox pattern already mandated by constitution §5.
-- **Rationale**: Nine services and a small initial team make operating a self-hosted broker (Kafka, RabbitMQ) a disproportionate ops burden before there is real traffic. A managed broker gives at-least-once delivery and dead-lettering out of the box; idempotent consumers (already required by §5) absorb the at-least-once semantics regardless of which broker is chosen, so the choice is swappable later without a domain-model change.
-- **Alternatives considered**: Self-hosted Kafka — best long-term throughput/ordering guarantees, rejected for v1 due to operational cost relative to unknown initial scale (`Scale/Scope` is itself `NEEDS CLARIFICATION`). NATS JetStream — lighter to self-host than Kafka, a reasonable second choice if the eventual hosting provider has no strong managed-broker option.
-- **Status**: NEEDS APPROVAL — this is an architecture decision, not a product-policy one, but it commits to real infrastructure cost and should be confirmed by whoever owns the hosting/cloud decision before Phase 1 contracts finalize event-delivery guarantees.
+- **Decision**: Self-hosted Kafka, paired with the transactional-outbox pattern already mandated by constitution §5.
+- **Rationale**: The platform is deliberately self-hosted (existing server, avoiding new per-service cloud spend) rather than cloud-hosted, so a managed broker's main advantage — no ops burden — comes with a recurring bill this project is specifically trying to avoid. Kafka gives the strongest ordering/replay guarantees of the options considered; idempotent consumers (already required by §5) absorb its at-least-once semantics.
+- **Alternatives considered**: A managed cloud broker — rejected once the hosting model was confirmed self-hosted (no cloud billing relationship to attach it to). NATS JetStream / RabbitMQ — lighter to operate than Kafka, but Kafka's ordering/replay guarantees were judged worth the extra operational surface for a platform where event redelivery already has to be idempotency-safe regardless.
+- **Status**: **RESOLVED** via `/speckit-clarify` 2026-09-12 (ADQ-001; `docs/architecture/decisions.md` ADR-008). Remaining work is the migration itself — every service's outbox-relay/consumer code currently targets the dev-only Redis-based pub/sub substitute (`packages/ts-platform/src/events/`), not Kafka.
 
 ## 6. Object storage for verification documents & media
 
-- **Decision**: An S3-compatible object store (exact vendor tied to the eventual cloud/hosting choice), accessed only through the Media service — never directly by a client or another domain service.
-- **Rationale**: Constitution §7 requires least-privilege, encrypted-at-rest handling for government-ID and other sensitive uploads; funneling all access through one service lets retention, encryption, and access-audit rules live in exactly one place (matches the Media service boundary in `plan.md`).
-- **Alternatives considered**: Direct client-to-storage signed uploads with no mediating service — rejected because it would let clients bypass the malware/format screening and consent/moderation handoff that Media is responsible for.
-- **Status**: Vendor selection and retention-period values remain open pending the hosting decision and the still-open data-retention product question (spec Open Question 9).
+- **Decision**: Managed cloud object storage (AWS S3, GCS, or Azure Blob — specific vendor still open), accessed only through the Media service — never directly by a client or another domain service.
+- **Rationale**: Unlike compute, object storage is billed per GB and is near-zero cost at test-phase volume, so this project's usual self-hosting rationale doesn't carry the same weight here — a managed provider gives encryption-at-rest, access logging, and compliance posture "for free" that self-hosting the platform's most sensitive data category (government-ID images) would otherwise require building and auditing in-house. Funneling all access through Media keeps retention, encryption, and access-audit rules in exactly one place (matches the Media service boundary in `plan.md`).
+- **Alternatives considered**: Self-hosted S3-compatible storage (MinIO) on the same server as everything else — rejected specifically for this data category despite matching the platform's general self-hosting posture, because the security/compliance tooling a managed provider gives "for free" would otherwise have to be built and audited in-house for government-ID documents. Direct client-to-storage signed uploads with no mediating service — rejected because it would let clients bypass the malware/format screening and consent/moderation handoff Media is responsible for.
+- **Status**: Mechanism **RESOLVED** via `/speckit-clarify` 2026-09-12 (ADQ-005; `docs/architecture/decisions.md` ADR-010). Vendor selection, encryption/key management, retention-period values, and regional residency remain open (retention also still gated on spec Open Question 9).
 
 ## 7. Map provider integration
 
@@ -58,17 +58,17 @@ Format per topic: Decision / Rationale / Alternatives considered.
 
 ## 9. Authentication
 
-- **Decision**: OAuth2/OIDC-based authentication (e.g., a managed identity provider or a self-hosted OIDC-compliant service) owned entirely by Identity & Profile; the gateway validates the resulting access token on every request and never re-implements login itself.
-- **Rationale**: `spec.md`'s own Assumptions section states "the authentication approach has not been chosen" — this is a real gap, not an oversight, and one every other service depends on. A standard OIDC flow keeps Identity & Profile swappable (managed vs. self-hosted) without changing how every other service verifies a caller.
-- **Alternatives considered**: Custom session-token auth — more implementation surface for equivalent guarantees, with no constitution or spec requirement favoring it.
-- **Status**: NEEDS APPROVAL — provider choice (managed vs. self-hosted OIDC) is an architecture decision the product/engineering leads should confirm before Identity & Profile's contract is finalized.
+- **Decision**: A managed OIDC-as-a-service provider (e.g. Auth0, Clerk, or AWS Cognito — specific vendor still open), owned entirely by Identity & Profile; the gateway validates the resulting access token on every request and never re-implements login itself.
+- **Rationale**: This app handles age-verification and identity-document data; a managed provider's free tier covers test/beta volume at $0 while the vendor — not this team — owns session security, MFA, and social-login correctness. Self-hosting (e.g. Keycloak) would match the platform's general cost-conscious, self-hosted posture, but saves nothing until well past free-tier volume while adding real security-maintenance burden to exactly the subsystem where mistakes are costliest.
+- **Alternatives considered**: Self-hosted OIDC (Keycloak) — no per-MAU cost, rejected for the reason above. Custom session-token auth — more implementation surface for equivalent guarantees, with no constitution or spec requirement favoring it.
+- **Status**: Mechanism **RESOLVED** via `/speckit-clarify` 2026-09-12 (ADQ-002a; `docs/architecture/decisions.md` ADR-007). Vendor selection remains open; migrating off the current dev-only `x-dev-user-id`/`DevOidcIssuer` stand-in is unstarted implementation work, not a design decision.
 
 ## 10. Payment/subscription integration pattern
 
-- **Decision**: Recommend platform in-app purchase (Apple In-App Purchase / Google Play Billing) for the mobile subscription and one-time-purchase entitlements, verified server-side via each store's receipt/webhook API by Entitlements & Billing; no card data ever reaches a Stranger service.
-- **Rationale**: Both app stores require digital, in-app-consumable entitlements (exactly what a "broadcast credit" or subscription is) to go through their IAP systems — this is a platform policy constraint, not a preference. Entitlements & Billing already owns "payment-event audit" per `plan.md`, so it is the natural place to verify store receipts.
-- **Alternatives considered**: A general payment processor (e.g., a card-network processor) charged directly — likely to violate app-store policy for this exact entitlement shape and was not pursued further.
-- **Status**: NEEDS CLARIFICATION (product/legal) — base prices, tax handling, refund exceptions, and multi-store restore-purchase behavior remain open (spec Open Questions 19-22) and are unaffected by this pattern choice.
+- **Decision**: Stripe, used identically for both the mobile and web clients, for the one-time-purchase and subscription entitlements — verified server-side via Stripe's webhook API by Entitlements & Billing; no card data ever reaches a Stranger service.
+- **Rationale**: The browser-parity decision (`docs/architecture/decisions.md` ADR-001 amendment) means purchases must work in a desktop browser tab, where platform in-app purchase (Apple IAP / Google Play Billing) has no equivalent — the previously recommended IAP-only pattern predates that decision and cannot satisfy it. A single processor avoids maintaining separate IAP and web purchase/receipt-verification code paths; Stripe has built-in subscription, proration, and webhook support that Entitlements & Billing's existing webhook-verification structure (`payment-webhook/`) can build on directly.
+- **Alternatives considered**: Platform IAP only — rejected, no web equivalent, breaks purchase parity for the browser client. Hybrid (IAP on mobile, Stripe on web) — rejected as the default; matches each platform's own convention but doubles the purchase/receipt-verification logic and reconciliation work to build and maintain for a two-platform-parity product this size.
+- **Status**: Mechanism **RESOLVED** via `/speckit-clarify` 2026-09-12 (ADQ-004; `docs/architecture/decisions.md` ADR-009). Base prices, tax handling, refund exceptions, trials/promotions, and launch-region rules remain open (spec Open Questions 20-22) and are unaffected by this pattern choice. `services/entitlements-billing/src/payment-webhook/mock-payment-verifier.ts` (built against the prior Apple/Google receipt-verification assumption) is now a migration target.
 
 ## 11. Testing stack
 
@@ -99,7 +99,7 @@ Since spec.md defines only the ~30-second push-delivery target, the following ar
   - **Push notifications**: web push support and reliability vary by browser (notably constrained on some iOS Safari configurations); FR-006's in-app/in-browser live-feed fallback is the floor guarantee on every browser regardless of push support.
   - **Media capture** (profile photo, liveness check, feedback photo): browsers use `getUserMedia`/file-input instead of a native camera API — functionally equivalent, no fallback needed, just a different Flutter plugin code path.
 - **Alternatives considered**: A separate server-rendered or SPA web app (e.g., Bootstrap + a JS framework) — rejected; doubles implementation and QA effort per feature and risks UX/behavior drift from the mobile app, which a shared Flutter codebase avoids entirely.
-- **Status**: Architecture decision resolved (`docs/architecture/decisions.md` ADR-001, amended). Still open: the supported-browser/version matrix and the applicable accessibility standard (ADQ-008).
+- **Status**: Architecture decision resolved (`docs/architecture/decisions.md` ADR-001, amended). The supported-browser matrix and accessibility standard are also now resolved — see topic 14's row below (ADQ-008).
 
 ## Summary of Approvals Needed Before `/speckit-tasks`
 
@@ -107,12 +107,12 @@ The consolidated, cross-feature tracker for these approvals lives in `docs/archi
 
 | # here | Topic | Tracked as |
 | --- | --- | --- |
-| 5 | Durable event bus vendor | ADQ-001 |
-| 9 | Auth provider | ADQ-002a |
-| 6 | Object storage vendor + retention | ADQ-005 |
-| 10 | Payment/store integration + pricing | ADQ-004 |
-| 12 | Performance targets | ADQ-007 |
+| 5 | Durable event bus | **Resolved** — self-hosted Kafka (`/speckit-clarify` 2026-09-12, ADR-008); migration off the current dev-only pub/sub substitute is unstarted |
+| 9 | Auth provider | **Resolved, vendor open** — managed OIDC-as-a-service (`/speckit-clarify` 2026-09-12, ADR-007); specific vendor still ADQ-002a |
+| 6 | Object storage vendor + retention | **Resolved, vendor open** — managed cloud object storage (`/speckit-clarify` 2026-09-12, ADR-010); specific vendor + retention still ADQ-005 |
+| 10 | Payment/store integration + pricing | **Resolved, pricing open** — Stripe for mobile and web (`/speckit-clarify` 2026-09-12, ADR-009); base prices/tax/trials still ADQ-004 |
+| 12 | Performance targets | ADQ-007 — deferred from the 2026-09-12 clarify round, needs real traffic/business forecasts |
 | 13 | Eligibility radius | **Resolved** — 5 km default, configurable per city (`/speckit-clarify`, spec.md FR-004) |
-| 14 | Supported-browser matrix + web accessibility standard | ADQ-008 |
+| 14 | Supported-browser matrix + web accessibility standard | **Resolved** — current-stable Chrome/Safari/Firefox/Edge, WCAG 2.1 AA (`/speckit-clarify` 2026-09-12, ADR-006 accepted) |
 
-All other topics above (1-4, 7, 8, 11, 14's Flutter-Web-as-architecture-choice itself) are resolved technical decisions and are treated as final for this plan. Topic 7 (map provider) was originally flagged for approval in an earlier architecture draft; it is fully resolved by spec.md's Clarifications (FR-020) and requires no further sign-off — see `docs/architecture/decisions.md` ADQ-003.
+All other topics above (1-4, 7, 8, 11) are resolved technical decisions and are treated as final for this plan. Topic 7 (map provider) was originally flagged for approval in an earlier architecture draft; it is fully resolved by spec.md's Clarifications (FR-020) and requires no further sign-off — see `docs/architecture/decisions.md` ADQ-003. As of 2026-09-12, the only topics still genuinely open are performance/capacity targets (12, ADQ-007) and four vendor/detail picks narrower than an architecture decision (specific auth vendor, specific storage vendor, payment pricing, and ADQ-002b's ongoing age-assurance operations — the last isn't a research topic here at all, it's a product/compliance question tracked directly in `spec.md`).

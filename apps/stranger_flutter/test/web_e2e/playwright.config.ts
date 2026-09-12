@@ -25,5 +25,30 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // Convergence T133 (ADQ-008, ADR-006): the approved v1 matrix is current-stable
+  // Chrome, Safari, Firefox, and Edge. Edge and Chrome share Chromium's engine, so a
+  // `msedge` channel run (real installed Edge, not just another Chromium build) is the
+  // meaningful addition over the existing `chromium` project, not a duplicate of it;
+  // Safari itself has no Playwright driver on any OS, so `webkit` (the closest
+  // automatable equivalent, same engine family) stands in for it, same as this
+  // convention is used industry-wide.
+  //
+  // Verified this session: chromium and firefox both pass all 4 tests. webkit
+  // currently FAILS all 4 — signUp's dismissLocationRationaleIfShown click on "Sounds
+  // good" doesn't dismiss the dialog in WebKit even after matching clickButton's
+  // scroll-into-view pattern (ruled out: timing, off-screen/no-scroll click). Root
+  // cause not yet found; a real, reproducible WebKit-only gap, not a flake — left
+  // failing rather than skipped so it stays visible. `edge` requires the `msedge`
+  // channel installed locally (`npx playwright install msedge`), which needs sudo in
+  // this environment and wasn't available to verify here; the config itself is
+  // correct and lists its 4 tests cleanly (`--list --project=edge`).
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    {
+      name: 'edge',
+      use: { ...devices['Desktop Edge'], channel: 'msedge' },
+    },
+  ],
 });

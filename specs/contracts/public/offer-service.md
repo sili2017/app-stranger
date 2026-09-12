@@ -45,7 +45,7 @@ Response `201 Created`:
 
 Errors: `401` unauthenticated, `403 ACCOUNT_RESTRICTED` (age-assurance not passed), `422 CONTENT_SCREENING_FAILED`, `402 ENTITLEMENT_REQUIRED`, `429` rate-limited.
 
-Rate limit: per constitution §5's abuse-prevention rule — publishing is limited per user; exact threshold `NEEDS CLARIFICATION` pending abuse-threshold policy (`plan.md` Security and Privacy Architecture).
+Rate limit: per constitution §5's abuse-prevention rule — publishing is limited to 5 per user per 60 seconds (`services/api-gateway/src/rate-limit/rate-limit.config.ts`), approved as v1 launch policy 2026-09-12 via `/speckit-clarify` (resolved — no longer NEEDS CLARIFICATION).
 
 ## POST /api/v1/offers/{offerId}/expressions-of-interest — Express interest
 

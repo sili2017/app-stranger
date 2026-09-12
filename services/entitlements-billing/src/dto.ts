@@ -1,4 +1,4 @@
-import { IsIn, IsString } from 'class-validator';
+import { IsIn, IsOptional, IsString } from 'class-validator';
 
 export class CreateSubscriptionDto {
   @IsIn(['weekly', 'monthly', 'yearly'])
@@ -6,6 +6,12 @@ export class CreateSubscriptionDto {
 
   @IsString()
   receiptToken!: string;
+
+  // T124/ADR-009: set when receiptToken is a Stripe Checkout Session id, so the
+  // webhook can later find this row by Stripe's own subscription id.
+  @IsOptional()
+  @IsString()
+  stripeSubscriptionId?: string;
 }
 
 export class PurchaseBroadcastDto {

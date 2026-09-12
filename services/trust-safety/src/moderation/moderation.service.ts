@@ -3,6 +3,7 @@ import { DomainError } from '@stranger/ts-platform';
 import { PrismaService } from '../prisma.service';
 import { TrustSafetyEventsProducer } from '../events/trust-safety-events.producer';
 import { AuditLogService } from '../audit/audit-log.service';
+import { InternalClients } from '../rating/internal-clients';
 import { ModerationDecisionDto } from './dto';
 
 /**
@@ -19,6 +20,7 @@ export class ModerationService {
     private readonly prisma: PrismaService,
     private readonly events: TrustSafetyEventsProducer,
     private readonly audit: AuditLogService,
+    private readonly internal: InternalClients,
   ) {}
 
   async createBlock(sourceUserId: string, targetUserId: string) {
@@ -32,6 +34,28 @@ export class ModerationService {
   /** The submitter's own block list — reflects every block immediately, any status. */
   async listMyBlocks(sourceUserId: string) {
     return this.prisma.block.findMany({ where: { sourceUserId } });
+  }
+
+  /**
+   * Convergence T126 (FR-015, Constitution §3.V): the enforcement rule other services
+   * call to decide whether userId should see/contact otherUserId. A submitter's own
+   * block excludes the target from *their* view immediately, any status (matches
+   * listMyBlocks/T090's existing submitter-side rule); the other direction only takes
+   * effect once a block is `enforced` by moderation review, per FR-015's "takes effect
+   * broadly... between the two users" only after review.
+   */
+  async isBlocked(userId: string, otherUserId: string): Promise<boolean> {
+    const [ownBlock, blockedByOther] = await Promise.all([
+      this.prisma.block.findUnique({
+        where: { sourceUserId_targetUserId: { sourceUserId: userId, targetUserId: otherUserId } },
+      }),
+      this.prisma.block.findUnique({
+        where: { sourceUserId_targetUserId: { sourceUserId: otherUserId, targetUserId: userId } },
+      }),
+    ]);
+    if (ownBlock) return true;
+    if (blockedByOther?.status === 'enforced') return true;
+    return false;
   }
 
   async createReport(
@@ -99,12 +123,13 @@ export class ModerationService {
   }
 
   /**
-   * T109: audit-logged moderator override of an FR-039 automated screening decision.
-   * The screening result itself lives on Offer's own `MeetOffer` row (Trust & Safety
-   * doesn't own it), so this records the decision and emits `trust.moderation-
-   * decisioned(subjectType: offer_screening)` for Offer to eventually consume — that
-   * consumer is a known gap (see T094's notes), so today this only produces the audit
-   * trail and the event, not an actual unpublish.
+   * T109, extended by Convergence T135: audit-logged moderator override of an FR-039
+   * automated screening decision. Emits `trust.moderation-decisioned(subjectType:
+   * offer_screening)`, now actually consumed by Offer (T135) to restore the offer when
+   * `decision === 'rejected'` (the automated rejection is itself overturned). Also
+   * syncs a ScreeningAppeal row (T128) if the creator submitted one, so their appeal
+   * shows a final status even though the decision itself lives on this event/audit
+   * trail, not the appeal row.
    */
   async overrideScreening(
     actorUserId: string,
@@ -124,6 +149,46 @@ export class ModerationService {
       decision,
       reason,
     });
+
+    const appeals = await this.prisma.screeningAppeal.findMany({ where: { offerId } });
+    for (const appeal of appeals) {
+      await this.prisma.screeningAppeal.update({
+        where: { id: appeal.id },
+        data: {
+          status: decision === 'rejected' ? 'upheld' : 'denied',
+          decidedAt: new Date(),
+        },
+      });
+    }
+
     return { offerId, decision };
+  }
+
+  /**
+   * Convergence T128 (FR-039, Clarifications Session 2026-09-12 round 2): a creator's
+   * self-service appeal of a screening rejection, mirroring VerificationCase's appeal
+   * shape. Verifies against Offer's own live status rather than trusting the caller.
+   */
+  async submitScreeningAppeal(creatorUserId: string, offerId: string, reason: string | undefined) {
+    const offer = await this.internal.getOfferStatus(offerId);
+    if (!offer) {
+      throw new DomainError('OFFER_NOT_FOUND', 'errors.offerNotFound', HttpStatus.NOT_FOUND);
+    }
+    if (offer.creatorUserId !== creatorUserId) {
+      throw new DomainError('UNAUTHORIZED', 'errors.unauthorized', HttpStatus.FORBIDDEN);
+    }
+    if (offer.status !== 'screening_rejected') {
+      throw new DomainError(
+        'NOT_APPEALABLE',
+        'errors.notAppealable',
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    return this.prisma.screeningAppeal.upsert({
+      where: { offerId_creatorUserId: { offerId, creatorUserId } },
+      create: { offerId, creatorUserId, reason },
+      update: {}, // a retried submission is idempotent, not a second appeal
+    });
   }
 }

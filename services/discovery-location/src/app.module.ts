@@ -6,10 +6,11 @@ import { EligibilityService } from './eligibility/eligibility.service';
 import { LocationController } from './location/location.controller';
 import { FeedController } from './feed/feed.controller';
 import { InternalEligibilityController } from './eligibility/internal-eligibility.controller';
+import { InternalClients } from './internal-clients';
 
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }])],
   controllers: [LocationController, FeedController, InternalEligibilityController],
-  providers: [PrismaService, EventConsumersService, EligibilityService],
+  providers: [PrismaService, EventConsumersService, EligibilityService, InternalClients],
 })
 export class AppModule {}

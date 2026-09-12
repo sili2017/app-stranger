@@ -57,12 +57,20 @@ export class RatingService {
     }
 
     const photoSubjects = dto.photoAssetId ? (dto.photoSubjectUserIds ?? []) : [];
-    const needsConsent = photoSubjects.length > 0;
-    const visibility = needsConsent ? 'pending_followup' : 'public';
+    const consentSatisfied = photoSubjects.length === 0;
     const photoConsent = photoSubjects.map((subjectUserId) => ({
       subjectUserId,
       consentedAt: null,
     }));
+
+    // Convergence T127 (FR-029, Clarifications Session 2026-09-12 round 2): mutual
+    // submission publishes immediately; a one-sided rating waits for the counterpart
+    // or the 5-day SLA (RatingVisibilitySlaScheduler) — either way, still gated on its
+    // own photo-consent requirement, which the mutual/SLA rule never bypasses.
+    const counterpart = await this.prisma.ratingFeedback.findUnique({
+      where: { selectionId_raterUserId: { selectionId: dto.selectionId, raterUserId: rateeUserId } },
+    });
+    const visibility = consentSatisfied && counterpart ? 'public' : 'pending_followup';
 
     const rating = await this.prisma.$transaction(async (tx) => {
       const row = await tx.ratingFeedback.create({
@@ -93,6 +101,32 @@ export class RatingService {
           correlationId,
         );
       }
+
+      // The counterpart's own rating may now also qualify — a mutual transition
+      // reveals both at once ("on the second submission"), not just this new one.
+      if (counterpart && counterpart.visibility !== 'public') {
+        const counterpartConsent =
+          (counterpart.photoConsent as { consentedAt: string | null }[]) ?? [];
+        const counterpartConsentSatisfied = counterpartConsent.every((c) => c.consentedAt !== null);
+        if (counterpartConsentSatisfied) {
+          const updatedCounterpart = await tx.ratingFeedback.update({
+            where: { id: counterpart.id },
+            data: { visibility: 'public', publicAt: new Date() },
+          });
+          await this.events.ratingSubmitted(
+            tx as unknown as PrismaService,
+            {
+              ratingFeedbackId: updatedCounterpart.id,
+              offerId: updatedCounterpart.offerId,
+              rateeUserId: updatedCounterpart.rateeUserId,
+              starRating: updatedCounterpart.starRating,
+              visibility: 'public',
+            },
+            correlationId,
+          );
+        }
+      }
+
       return row;
     });
 
@@ -116,15 +150,23 @@ export class RatingService {
     );
     const allConsented = updatedConsents.every((c) => c.consentedAt !== null);
 
+    // Convergence T127: consent clearing is one of two independent gates — still needs
+    // a counterpart rating to publish immediately; absent one, RatingVisibilitySlaScheduler
+    // picks it up once the 5-day SLA elapses (it only re-checks consent, already done here).
+    const counterpart = await this.prisma.ratingFeedback.findUnique({
+      where: { selectionId_raterUserId: { selectionId: rating.selectionId, raterUserId: rating.rateeUserId } },
+    });
+    const shouldPublish = allConsented && !!counterpart;
+
     const updated = await this.prisma.$transaction(async (tx) => {
       const row = await tx.ratingFeedback.update({
         where: { id: ratingFeedbackId },
         data: {
           photoConsent: updatedConsents as any,
-          ...(allConsented ? { visibility: 'public', publicAt: new Date() } : {}),
+          ...(shouldPublish ? { visibility: 'public', publicAt: new Date() } : {}),
         },
       });
-      if (allConsented) {
+      if (shouldPublish) {
         await this.events.ratingSubmitted(
           tx as unknown as PrismaService,
           {

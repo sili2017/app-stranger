@@ -4,10 +4,11 @@ import { PrismaService } from './prisma.service';
 import { InternalClients } from './internal-clients';
 import { ChatCreationConsumer } from './chat-creation.consumer';
 import { MessagingController } from './messaging.controller';
+import { RetentionPurgeScheduler } from './retention-purge-scheduler';
 
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }])],
   controllers: [MessagingController],
-  providers: [PrismaService, InternalClients, ChatCreationConsumer],
+  providers: [PrismaService, InternalClients, ChatCreationConsumer, RetentionPurgeScheduler],
 })
 export class AppModule {}

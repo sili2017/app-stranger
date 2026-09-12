@@ -11,6 +11,7 @@ import { RebroadcastService } from './offers/rebroadcast';
 import { ExpiryScheduler } from './offers/expiry-scheduler';
 import { OutboxRelayService } from './events/outbox-relay.service';
 import { InterestCountConsumer } from './offers/interest-count.consumer';
+import { ModerationDecisionConsumer } from './offers/moderation-decision.consumer';
 
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }])],
@@ -21,6 +22,7 @@ import { InterestCountConsumer } from './offers/interest-count.consumer';
     PrismaOutboxRepository,
     OutboxRelayService,
     InterestCountConsumer,
+    ModerationDecisionConsumer,
     InternalClients,
     OffersService,
     RebroadcastService,

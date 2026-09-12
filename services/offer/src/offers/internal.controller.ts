@@ -52,6 +52,11 @@ export class InternalOffersController {
       lat: offer.placeLat,
       lng: offer.placeLng,
       rendezvousInstruction: offer.rendezvousInstruction,
+      // Convergence T132: same authorization scope as the place fields above (creator
+      // or accepted-recipient only) — added so Trust & Safety's trusted-contact share
+      // doesn't need a second internal call for otherwise-non-sensitive fields.
+      activityText: offer.activityText,
+      expiresAt: offer.expiresAt,
     };
   }
 }

@@ -125,17 +125,24 @@ class _FeedScreenState extends State<FeedScreen> {
       appBar: AppBar(
         title: Text(l10n.feedTitle),
         actions: [
-          IconButton(
-            icon: Badge(
-              label: Text('$_notificationCount'),
-              isLabelVisible: _notificationCount > 0,
-              child: const Icon(Icons.notifications_outlined),
+          // Convergence T134 (ADQ-008, WCAG 2.1 AA): axe-core flagged this button as
+          // having no accessible name — Badge wrapping the icon appears to interfere
+          // with IconButton's usual tooltip-to-semantics-label behavior on web. An
+          // explicit outer Semantics label fixes it regardless of Badge's own behavior.
+          Semantics(
+            label: l10n.notificationsTooltip,
+            child: IconButton(
+              icon: Badge(
+                label: Text('$_notificationCount'),
+                isLabelVisible: _notificationCount > 0,
+                child: const Icon(Icons.notifications_outlined),
+              ),
+              tooltip: l10n.notificationsTooltip,
+              onPressed: () => Navigator.of(context)
+                  .push(MaterialPageRoute(
+                      builder: (_) => const NotificationsScreen()))
+                  .then((_) => _loadNotificationCount()),
             ),
-            tooltip: l10n.notificationsTooltip,
-            onPressed: () => Navigator.of(context)
-                .push(MaterialPageRoute(
-                    builder: (_) => const NotificationsScreen()))
-                .then((_) => _loadNotificationCount()),
           ),
           IconButton(
             icon: const Icon(Icons.location_city_outlined),

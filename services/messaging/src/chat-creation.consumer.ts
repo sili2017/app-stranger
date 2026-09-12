@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import Redis from 'ioredis';
-import { DomainEvent, EventIdempotencyGuard, RedisEventBus } from '@stranger/ts-platform';
+import { DomainEvent, EventIdempotencyGuard, createEventBus } from '@stranger/ts-platform';
 import { PrismaService } from './prisma.service';
 import { InternalClients } from './internal-clients';
 
@@ -22,7 +22,7 @@ const CONSUMER_NAME = 'messaging';
 @Injectable()
 export class ChatCreationConsumer implements OnModuleInit {
   private readonly redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
-  private readonly eventBus = new RedisEventBus(this.redisUrl);
+  private readonly eventBus = createEventBus(this.redisUrl, 'messaging');
   private readonly idempotency = new EventIdempotencyGuard(new Redis(this.redisUrl));
 
   constructor(
@@ -85,7 +85,8 @@ export class ChatCreationConsumer implements OnModuleInit {
     const offerId = String(d.offerId);
     await this.prisma.chat.updateMany({
       where: { offerId },
-      data: { status: 'archived_readonly' },
+      // Convergence T130: archivedAt anchors the 12-month retention purge.
+      data: { status: 'archived_readonly', archivedAt: new Date() },
     });
   }
 }

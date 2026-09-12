@@ -12,6 +12,9 @@ PG_DATA="$TOOLING/pgdata"
 REDIS_BIN="$TOOLING/redis-stable/src"
 REDIS_PORT=6379
 
+KAFKA_BIN="$TOOLING/kafka/bin"
+KAFKA_CONFIG="$TOOLING/kafka/config/kraft/server-local.properties"
+
 SERVICES=(identity-profile offer discovery-location participation messaging \
            trust-safety entitlements-billing notification media api-gateway)
 
@@ -52,6 +55,9 @@ echo "==> Backend services"
 for svc in "${SERVICES[@]}"; do
   stop_pidfile "$svc" "$PIDS/$svc.pid"
 done
+
+echo "==> Kafka"
+stop_pidfile "kafka" "$PIDS/kafka.pid"
 
 echo "==> Redis"
 if "$REDIS_BIN/redis-cli" -p "$REDIS_PORT" ping >/dev/null 2>&1; then

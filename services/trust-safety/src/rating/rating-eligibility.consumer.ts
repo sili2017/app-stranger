@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import Redis from 'ioredis';
-import { DomainEvent, EventIdempotencyGuard, RedisEventBus } from '@stranger/ts-platform';
+import { DomainEvent, EventIdempotencyGuard, createEventBus } from '@stranger/ts-platform';
 import { PrismaService } from '../prisma.service';
 
 const CONSUMER_NAME = 'trust-safety';
@@ -24,7 +24,7 @@ export function shouldCreatePromptFor(outcome: unknown): boolean {
 @Injectable()
 export class RatingEligibilityConsumer implements OnModuleInit {
   private readonly redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
-  private readonly eventBus = new RedisEventBus(this.redisUrl);
+  private readonly eventBus = createEventBus(this.redisUrl, 'trust-safety');
   private readonly idempotency = new EventIdempotencyGuard(new Redis(this.redisUrl));
 
   constructor(private readonly prisma: PrismaService) {}

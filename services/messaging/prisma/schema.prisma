@@ -34,10 +34,15 @@ enum ChatStatus {
 }
 
 model Chat {
-  id        String     @id @default(uuid())
-  offerId   String     @unique
-  status    ChatStatus @default(active)
-  createdAt DateTime   @default(now()) @db.Timestamptz(3)
+  id         String     @id @default(uuid())
+  offerId    String     @unique
+  status     ChatStatus @default(active)
+  createdAt  DateTime   @default(now()) @db.Timestamptz(3)
+  /// Convergence T130 (FR-038, Clarifications Session 2026-09-12 round 2): set when
+  /// status becomes archived_readonly — the anchor for the 12-month retention purge.
+  archivedAt DateTime?  @db.Timestamptz(3)
+  /// Overrides the retention purge timer for an active legal/safety investigation.
+  legalHold  Boolean    @default(false)
 
   memberships ChatMembership[]
   messages    Message[]

@@ -16,7 +16,7 @@
     "format": "prettier --check \"services/**/*.ts\" \"packages/**/*.ts\"",
     "format:write": "prettier --write \"services/**/*.ts\" \"packages/**/*.ts\"",
     "test": "npm run test --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build -w packages/ts-platform && npm run build --workspaces --if-present",
     "seed": "node scripts/seed-test-data.js"
   },
   "devDependencies": {

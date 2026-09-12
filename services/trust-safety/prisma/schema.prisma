@@ -112,6 +112,9 @@ model Report {
   status         ReportStatus      @default(pending_review)
   createdAt      DateTime          @default(now()) @db.Timestamptz(3)
   decidedAt      DateTime?         @db.Timestamptz(3)
+  /// Convergence T130 (FR-015, Clarifications Session 2026-09-12 round 2): overrides
+  /// the 12-month retention purge timer for an active legal/safety investigation.
+  legalHold      Boolean           @default(false)
 
   @@index([reporterUserId])
   @@index([subjectType, subjectId])
@@ -123,6 +126,29 @@ model TrustedContactSetting {
   // Highly Restricted (data-model.md): encrypted at rest, never in a list/discovery response.
   contactHandleEncrypted String
   updatedAt              DateTime @updatedAt @db.Timestamptz(3)
+}
+
+/// Convergence T128 (FR-039, Clarifications Session 2026-09-12 round 2): a creator's
+/// self-service appeal of an automated screening rejection, mirroring
+/// Identity & Profile's VerificationCase appeal shape. Resolved via the existing
+/// moderator-only screening-overrides endpoint, which also updates this row's status.
+model ScreeningAppeal {
+  id            String                @id @default(uuid())
+  offerId       String
+  creatorUserId String
+  reason        String?
+  status        ScreeningAppealStatus @default(submitted)
+  createdAt     DateTime              @default(now()) @db.Timestamptz(3)
+  decidedAt     DateTime?             @db.Timestamptz(3)
+
+  @@unique([offerId, creatorUserId])
+  @@index([status])
+}
+
+enum ScreeningAppealStatus {
+  submitted
+  upheld
+  denied
 }
 
 /// T109: separate, immutable audit-event stream distinct from ordinary application logs

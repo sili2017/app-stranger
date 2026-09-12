@@ -18,7 +18,7 @@ Per the constitution, the technical approach is a frontend-neutral platform: Flu
 
 **Primary Dependencies**: Backend framework, schema-validation/OpenAPI tooling, and ORM/migration tooling for the Node/TypeScript services are selected in `research.md` (recommendation: NestJS + Zod/class-validator + Prisma) so that all nine domain services share one convention instead of each choosing independently.
 
-**Storage**: PostgreSQL, one database (or strictly isolated schema + credentials) per owning microservice; Redis for cache, rate limiting, and ephemeral coordination (non-authoritative); object storage (provider selected in `research.md`) for verification documents and feedback/profile media.
+**Storage**: PostgreSQL, one database (or strictly isolated schema + credentials) per owning microservice; Redis for cache, rate limiting, and ephemeral coordination (non-authoritative); managed cloud object storage (mechanism resolved 2026-09-12 via `/speckit-clarify`, ADQ-005 — specific vendor still open, see `research.md` §6) for verification documents and feedback/profile media.
 
 **Testing**: `flutter_test`/`integration_test` for Dart; Jest (or Vitest) + Supertest for Node/TypeScript unit and API tests; OpenAPI-schema conformance (contract tests) for every public and inter-service contract; Playwright (web) and a mobile E2E runner (Maestro/Detox) for the critical cross-client journeys (publish → discover → interest → select → chat).
 
@@ -43,14 +43,14 @@ Per the constitution, the technical approach is a frontend-neutral platform: Flu
 | Technology stack matches constitution (§4) | PASS | Flutter/Dart clients, Node.js/TypeScript services, PostgreSQL per service, Redis, Docker, GitHub Actions, GitHub, Sentry — no substitutions proposed. |
 | Layered, domain-aligned microservice architecture with explicit ownership (§5) | PASS | Client / API-edge / domain-services / platform layers are defined below; every service lists what it owns and explicitly does not own. |
 | Real-world connection with informed consent (§3.I) | PARTIAL | Pre-selection profile fields (FR-013) and post-selection place disclosure (FR-002) are specified; the consent-capture flow for an identifiable-person feedback photo (FR-029) still needs a concrete UX/data-model treatment. |
-| Safety, privacy, adult-only readiness for release (§3.II, §9) | BLOCKED for release, not for design | Age-assurance appeal SLA, moderation review turnaround, data-retention windows, and v1 launch countries remain open in spec.md (Open Questions 1, 9, 18). Architecture, data model, and contract design may proceed against the rules that ARE fixed; no code implementing the gated behaviors may ship until these are resolved (constitution §9). |
+| Safety, privacy, adult-only readiness for release (§3.II, §9) | PARTIAL, improved from BLOCKED | Moderation review turnaround (4 hours) is resolved and already implemented (`moderation.service.ts`); auth mechanism is resolved (ADQ-002a, managed OIDC, ADR-007), though the vendor migration off `x-dev-user-id`/`DevOidcIssuer` is unstarted. Data retention (chat/reports/moderation cases: 12 months, legal-hold override) is resolved 2026-09-12 via `/speckit-clarify` but not yet implemented (no purge job exists); the abuse-prevention rate-limit table is resolved and already implemented (`rate-limit.config.ts`). Still open: age-assurance appeal SLA specifics, ongoing re-verification cadence, and v1 launch countries (ADQ-002b, spec.md Open Questions 1, 18). No code implementing the still-gated behaviors may ship until these are resolved (constitution §9). |
 | Time-bound offers are honest and unambiguous (§3.III) | PASS | Offer lifecycle (active/stopped/expired), 15-minute default, 5-30 minute creator range, and countdown-start rule are fully specified (FR-003, FR-017). |
 | Location relevance without unnecessary exposure (§3.IV) | PARTIAL | Distance-band-before-selection, single-location-snapshot, and the default eligibility radius (5 km, configurable per city) are specified; GPS sampling interval and last-known-location staleness thresholds are still open (spec Open Question 4). |
-| Trust signals fair, consented, reviewable (§3.V) | PARTIAL | Consent-before-publish for an identifiable-person photo and the rating follow-up delay (2 hours after "happened") are specified (FR-029); moderation/appeal turnaround and the rating scale are still open (Open Questions 15-16). |
-| Payments/subscriptions implementation-ready (§4, §7) | BLOCKED for release, not for design | Base subscription prices, payment provider/store, tax handling, and refund/restore rules remain open (Open Questions 19-22). Billing contracts are designed against the rules that ARE fixed: 3 free offers/month, 10%/20% discounts, cancel-at-period-end with no refund. |
-| Event transport and operational SLOs approved (§5) | OPEN | No durable event-bus technology is selected yet. `research.md` records a recommendation pending architecture approval. |
+| Trust signals fair, consented, reviewable (§3.V) | PARTIAL, improved from PARTIAL | Consent-before-publish for an identifiable-person photo, the rating follow-up delay (2 hours), and the 1-5 star rating scale are all resolved and already implemented. Rating visibility (mutual → immediate; one-sided → 5-day SLA then public) and a self-service offer-screening appeal path are resolved 2026-09-12 via `/speckit-clarify` but **not yet implemented** — the counterpart-rating/SLA check, the appeal endpoint, and its review workflow are new work (see `data-model.md`'s `RatingFeedback` and spec.md FR-039). |
+| Payments/subscriptions implementation-ready (§4, §7) | PARTIAL, improved from BLOCKED for release | Payment mechanism is resolved — Stripe, identically on mobile and web (ADQ-004, ADR-009), replacing the prior platform-IAP-only assumption that had no web equivalent. Still open: base subscription prices, tax handling, and refund/restore rules (Open Questions 20-22). Billing contracts can now be designed against a single concrete processor instead of a placeholder. |
+| Event transport and operational SLOs approved (§5) | PARTIAL, improved from OPEN | Event-bus technology is resolved — self-hosted Kafka (ADQ-001, ADR-008). Operational SLOs (peak concurrent users, p95 targets, recovery objectives) remain open (ADQ-007, deferred — needs real traffic/business forecasts, not an architecture pick). |
 
-**Decision**: Proceed to Phase 0/1 (research, data model, contracts, quickstart) using the requirements that are already fixed as the source of truth. Per constitution §9, no `/speckit-tasks` item that implements a still-gated safety, payment, or event-transport decision may be executed until that decision is resolved by the product owner (and, where noted, architecture approval) — `/speckit-tasks` must mark those tasks blocked rather than silently inventing an answer.
+**Decision**: Proceed to Phase 0/1 (research, data model, contracts, quickstart) using the requirements that are already fixed as the source of truth. Per constitution §9, no `/speckit-tasks` item that implements a still-gated safety, payment, or event-transport decision may be executed until that decision is resolved by the product owner (and, where noted, architecture approval) — `/speckit-tasks` must mark those tasks blocked rather than silently inventing an answer. As of 2026-09-12, five of the seven previously-blocking architecture decisions (auth mechanism, event-bus technology, payment mechanism, storage mechanism, browser/accessibility matrix) are resolved via `/speckit-clarify` — see `docs/architecture/decisions.md` ADR-006 through ADR-010. What remains gated is narrower: two vendor picks (auth, storage), pricing specifics (payments), and two genuinely deferred product/compliance decisions (ADQ-002b, ADQ-007).
 
 ## Project Structure
 
@@ -120,22 +120,26 @@ docs/
 ## Solution Architecture
 
 ```text
-Flutter phone/tablet         Flutter Web (future, unapproved for release)
+Flutter phone/tablet         Flutter Web (ships in v1, full parity)
           \                         /
            \                       /
             +-- HTTPS + REST v1 --+
                        |
             API Gateway / Client API
+            (token validation: managed OIDC, ADR-007)
                        |
      +-----------------+-----------------+
      |                 |                 |
 Identity & Profile  Offer            Discovery & Location
      |                 |                 |
-     +---------- domain-event boundary (durable bus) ----------+
+     +---------- domain-event boundary (self-hosted Kafka, ADR-008) ----------+
      |                                                          |
 Participation   Messaging   Trust & Safety   Entitlements & Billing
      |                                                          |
 Notification    Media       PostgreSQL (1 per service)   Redis
+                    |                     |
+        managed cloud object storage      Stripe (ADR-009)
+             (ADR-010)
                                           |
                         Sentry + structured logs + metrics + traces + audit events
 ```
@@ -166,13 +170,13 @@ Notification    Media       PostgreSQL (1 per service)   Redis
 | Notification | Delivery preferences, notification jobs, delivery status | Service-triggered push/in-app delivery within the ~30s target (FR-006), localized templates, retry/idempotency | Feed ranking, offer state authority |
 | Media | Uploaded profile/feedback/verification media metadata and access grants | Malware/format checks, consent/moderation handoff, expiring delivery URLs | Public-feedback policy, identity-verification decision |
 
-**Integration boundary**: an identity-verification vendor, a payment provider/app-store, a map provider (Apple Maps on iOS / Google Maps on Android, per FR-020), an object-storage provider, a push provider, and the durable event bus are external integrations, not product-domain services — each is isolated behind an adapter so no client or domain service depends on a vendor API directly.
+**Integration boundary**: an identity-verification vendor, a managed OIDC-as-a-service auth provider (ADQ-002a, ADR-007), Stripe as the payment processor (ADQ-004, ADR-009), a map provider (Apple Maps on iOS / Google Maps on Android, per FR-020), a managed cloud object-storage provider (ADQ-005, ADR-010), a push provider, and self-hosted Kafka as the durable event bus (ADQ-001, ADR-008) are external integrations, not product-domain services — each is isolated behind an adapter so no client or domain service depends on a vendor API directly.
 
 ### Layer 4 — Platform and Integrations
 
 - PostgreSQL is isolated per service (own database or strictly isolated schema + credentials); no service queries another service's owned tables.
 - Redis handles rate limiting, cacheable discovery read models, and short-lived coordination; it is never the system of record for offer, entitlement, participation, or audit state.
-- A durable event bus (technology TBD — see `research.md`) carries domain events such as `offer.published`, `offer.stopped`, `offer.expired`, `participation.interest-expressed`, `participation.participant-selected`, `billing.subscription-changed`, `trust.rating-submitted`, and `trust.moderation-decisioned` (full list and payload shapes in `contracts/events.md`), using a transactional outbox and idempotent consumers (constitution §5) so a redelivered event cannot create a duplicate chat, charge, or notification. Event payloads are minimized per consumer need — `offer.published` carries only a truncated geohash, never the offer's exact coordinates (`contracts/events.md`'s Payload Minimization Rule).
+- Self-hosted Kafka (ADQ-001, resolved 2026-09-12, `docs/architecture/decisions.md` ADR-008) carries domain events such as `offer.published`, `offer.stopped`, `offer.expired`, `participation.interest-expressed`, `participation.participant-selected`, `billing.subscription-changed`, `trust.rating-submitted`, and `trust.moderation-decisioned` (full list and payload shapes in `contracts/events.md`), using a transactional outbox and idempotent consumers (constitution §5) so a redelivered event cannot create a duplicate chat, charge, or notification. Event payloads are minimized per consumer need — `offer.published` carries only a truncated geohash, never the offer's exact coordinates (`contracts/events.md`'s Payload Minimization Rule). The current implementation targets a dev-only Redis-based pub/sub substitute (`packages/ts-platform/src/events/`); the Kafka migration itself is unstarted.
 - Sentry captures errors with a PII-safe configuration; structured logs, traces, metrics, and audit events share a correlation ID and exclude or redact chat content, verification material, payment data, and precise location.
 
 ## Critical Cross-Service Flows
@@ -200,13 +204,34 @@ Notification    Media       PostgreSQL (1 per service)   Redis
 3. Entitlements & Billing records an auditable subscription or one-time entitlement and emits `billing.subscription-changed` or `billing.one-time-broadcast-granted`.
 4. Publishing always calls Entitlements & Billing as the single authority; a client-reported purchase status is never trusted on its own.
 
+### Post-meetup rating visibility (resolved 2026-09-12, not yet implemented)
+1. `promptSentAt`'s existing 2-hour delayed job (FR-029) still triggers the rating prompt to both parties as today.
+2. **New**: on each `POST /api/v1/ratings` submission, Trust & Safety checks whether the counterpart (`raterUserId`/`rateeUserId` swapped, same `selectionId`) has also rated. If so — and the photo-consent gate (unchanged) is satisfied — both become `public` immediately.
+3. **New**: a scheduled job (same delayed-job pattern as `promptSentAt`) fires 5 days after `promptSentAt` for any `RatingFeedback` still `pending_followup` with no counterpart rating, and flips it to `public` on its own.
+4. No new cross-service calls are introduced — this is entirely internal to Trust & Safety's own `RatingFeedback` table.
+
+### Offer-screening appeal (resolved 2026-09-12, not yet implemented)
+1. `POST /api/v1/offers` rejects with `422 CONTENT_SCREENING_FAILED` as today (FR-039); the offer is never persisted as active.
+2. **New**: Offer records the rejection (activity text, rule version, timestamp) so a creator can appeal it — mirroring `VerificationCase`'s existing appeal shape (`SubmitAppealDto` in Identity & Profile) rather than a new pattern.
+3. **New**: a `POST .../appeals`-style endpoint (owning service TBD at task-breakdown time — likely Trust & Safety, which already owns `internal/v1/trust-safety/screening-overrides`) lets the creator submit that appeal; a moderator resolves it via the existing override endpoint, now reachable from a real user action instead of only ad hoc moderator-initiated review.
+4. No event contract changes — this reuses Trust & Safety's existing moderation-case decision shape (`enforced | rejected | appeal_upheld | appeal_denied`).
+
+### Data retention purge (resolved 2026-09-12, not yet implemented)
+1. **New**: a recurring job (per service — Messaging for `Chat`/`Message`, Trust & Safety for `Report`/`ModerationCase`) finds records whose closing timestamp (`archived_readonly` for chats, case-resolution for reports) is more than 12 months old and has no active legal/safety hold, then deletes or anonymizes them (FR-015, FR-038).
+2. No cross-service event is needed — retention is enforced entirely within the owning service, consistent with each service's exclusive data ownership (constitution §5).
+
+### Emergency guidance and trusted-contact sharing (resolved 2026-09-12, not yet implemented)
+1. Emergency guidance is a static, always-accessible client screen — no backend call at all, just bundled safety copy (confirm the meeting place, tell someone, contact local emergency services).
+2. **New**: a manual, one-tap client action calls a new Trust & Safety endpoint (alongside the existing `trusted-contacts` settings controller) that looks up the caller's `TrustedContactSetting`, decrypts it server-side, and sends that contact the current offer's activity/place/time once (via Notification or a direct out-of-band channel — mechanism TBD at task-breakdown time). Not automatic or continuous; nothing repeats after the one send.
+
 ## Security and Privacy Architecture
 
 - Adult-only access is enforced at Identity & Profile and re-checked at every sensitive endpoint; the approved age-assurance rule (FR-016) governs whether an account may publish, discover, express interest, or chat.
+- End-user authentication is a managed OIDC-as-a-service provider (ADQ-002a, resolved 2026-09-12, ADR-007); the gateway validates the resulting access token on every request. This replaces the current dev-only `x-dev-user-id` header / `DevOidcIssuer` stand-in, which remains in place until that migration happens.
 - Services use least-privilege service identities; service-to-service traffic is authenticated and authorized, and moderator/admin routes require separate roles with an audit trail (constitution §7).
 - Precise coordinates, government-ID material, payment data, chat content, reports, and trusted-contact details never appear in broad discovery/profile read models or telemetry.
 - Public results always use a distance band, never an exact distance (FR-026); the location-disclosure policy governs when a pin/live/moving location becomes visible (FR-002).
-- Authentication, publishing, interest, chat, feedback, report, media, and billing endpoints are rate-limited; abuse thresholds and retention windows are recorded once the corresponding spec Open Questions are resolved.
+- Authentication, publishing, interest, chat, feedback, report, media, and billing endpoints are rate-limited; the full per-endpoint threshold table is approved as v1 policy (`services/api-gateway/src/rate-limit/rate-limit.config.ts`, resolved 2026-09-12). Chat and safety-report/moderation-case retention (12 months, legal-hold override) is also resolved, but not yet implemented — no purge job exists.
 - **Browser-specific handling (FR-041)**: the Geolocation and Notification web APIs differ from their native-mobile counterparts — a browser re-prompts for location access more often (typically per session, not once at install) and push delivery is inconsistent across browsers (notably limited/absent on some iOS Safari configurations). The client applies FR-005's last-known-location fallback and FR-006's in-app-live-feed fallback identically on web, so a recipient with denied/unsupported browser permissions still gets the same degraded-but-functional experience already specified for mobile — never a silently broken feature.
 
 ## Phase 0/1 Design Outputs
@@ -215,7 +240,7 @@ Notification    Media       PostgreSQL (1 per service)   Redis
 2. `data-model.md` — per-service data ownership, entities, relationships, and state transitions (Phase 1).
 3. `contracts/api-standards.md` and `contracts/events.md` — REST and domain-event contract conventions, with one worked example (Phase 1).
 4. `quickstart.md` — end-to-end validation guide tied to each user story's independent test (Phase 1).
-5. `../docs/architecture/decisions.md` — the durable, cross-feature Architecture Decision Record (ADR-001 through ADR-005), the single consolidated open-decision tracker (ADQ-001 through ADQ-007), and the architecture risk register. This is a living document, not regenerated per feature; later features append to it rather than restating it.
+5. `../docs/architecture/decisions.md` — the durable, cross-feature Architecture Decision Record (ADR-001 through ADR-010), the single consolidated open-decision tracker (ADQ-001 through ADQ-008), and the architecture risk register. This is a living document, not regenerated per feature; later features append to it rather than restating it.
 6. This plan's Constitution Check, re-verified after Phase 1 design (see below).
 
 ## Post-Design Re-Check

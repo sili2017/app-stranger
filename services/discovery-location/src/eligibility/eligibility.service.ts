@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma.service';
 import { decodeGeohash } from './geohash';
 import { haversineKm, toDistanceBand, DistanceBand } from './distance';
 import { eligibilityRadiusKm } from './eligibility-radius';
+import { InternalClients } from '../internal-clients';
 
 /** FR-005 (resolved via /speckit-clarify): a last-known location is usable for up to 10 minutes. */
 const LAST_KNOWN_STALENESS_MS = 10 * 60 * 1000;
@@ -29,7 +30,10 @@ export interface FeedFilters {
 
 @Injectable()
 export class EligibilityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly internal: InternalClients,
+  ) {}
 
   /**
    * T060: recipient is eligible when offer.status == active AND
@@ -106,6 +110,10 @@ export class EligibilityService {
       const minutesRemaining = Math.max(0, (offer.expiresAt.getTime() - now) / 60_000);
       if (filters.minMinutesRemaining && minutesRemaining < filters.minMinutesRemaining) continue;
 
+      // Convergence T126 (FR-015): a blocked creator's offers never appear in the
+      // recipient's feed, regardless of distance/city eligibility.
+      if (await this.internal.isBlocked(recipientUserId, offer.creatorUserId)) continue;
+
       results.push({
         offerId: offer.offerId,
         cityId: offer.cityId,
@@ -132,5 +140,58 @@ export class EligibilityService {
   async isEligible(recipientUserId: string, offerId: string): Promise<boolean> {
     const eligible = await this.listEligibleForRecipient(recipientUserId);
     return eligible.some((offer) => offer.offerId === offerId);
+  }
+
+  /**
+   * Convergence T125 (FR-006): the reverse direction of listEligibleForRecipient —
+   * given one offer, which recipients are eligible for it right now. Used by
+   * Notification to fan out "a new offer is nearby" within ~30s of publish, per
+   * contracts/events.md's offer.published contract (Notification is a named consumer).
+   * Reuses the exact same eligibility rule (distance + city-interest fallback) as the
+   * recipient-facing feed so the two directions can never drift apart. Every candidate
+   * user's own LocationSnapshot/CityInterest state is checked in application code
+   * (no PostGIS in this environment), matching the existing scale posture of this v1
+   * codebase (ADQ-007 capacity targets are still open).
+   */
+  async listEligibleRecipientsForOffer(offerId: string): Promise<string[]> {
+    const offer = await this.prisma.discoveryEligibility.findUnique({ where: { offerId } });
+    if (!offer || offer.status !== 'active') {
+      return [];
+    }
+
+    const offerPoint = decodeGeohash(offer.placeGeohash);
+    const radiusKm = eligibilityRadiusKm(offer.cityId);
+    const candidates = await this.prisma.locationSnapshot.findMany();
+
+    const now = Date.now();
+    const eligibleUserIds: string[] = [];
+
+    for (const location of candidates) {
+      if (location.userId === offer.creatorUserId) continue;
+
+      const isStale =
+        location.source === 'last_known' &&
+        now - location.capturedAt.getTime() > LAST_KNOWN_STALENESS_MS;
+      if (isStale) continue;
+
+      const distanceKm = haversineKm(location, offerPoint);
+      if (distanceKm > radiusKm) continue;
+
+      const cityInterests = await this.prisma.cityInterest.findMany({
+        where: { userId: location.userId },
+      });
+      const hasAnyInterest = cityInterests.length > 0;
+      const matchesThisCity = cityInterests.some((c) => c.cityId === offer.cityId);
+      // Mirrors listEligibleForRecipient's fallback: a registered interest narrows to
+      // that set of cities, but with none registered every active city is in play.
+      if (hasAnyInterest && !matchesThisCity) continue;
+
+      // Convergence T126 (FR-015): don't push-notify a recipient blocked with the creator.
+      if (await this.internal.isBlocked(location.userId, offer.creatorUserId)) continue;
+
+      eligibleUserIds.push(location.userId);
+    }
+
+    return eligibleUserIds;
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../core/app_exception.dart';
 import '../l10n/gen/app_localizations.dart';
@@ -115,6 +116,37 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
     try {
       await context.read<AppState>().offer.stop(widget.offerId);
       await _load();
+    } catch (e) {
+      if (mounted) showErrorSnackBar(context, e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Convergence T132 (FR-015, Clarifications Session 2026-09-12 round 2): manual,
+  /// one-tap — not automatic or continuous. The backend returns a preformatted message
+  /// for the user to hand off via whatever channel they and their contact already use.
+  Future<void> _shareMeetup() async {
+    final l10n = AppLocalizations.of(context)!;
+    setState(() => _busy = true);
+    try {
+      final share =
+          await context.read<AppState>().trustSafety.shareMeetup(widget.offerId);
+      await Clipboard.setData(ClipboardData(text: share.message));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.safetyShareMeetupSent)),
+        );
+      }
+    } on AppException catch (e) {
+      if (!mounted) return;
+      if (e.code == 'NO_TRUSTED_CONTACT') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.safetyShareMeetupNoContact)),
+        );
+      } else {
+        showErrorSnackBar(context, e);
+      }
     } catch (e) {
       if (mounted) showErrorSnackBar(context, e);
     } finally {
@@ -246,6 +278,15 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
               const SizedBox(height: 8),
               Text(l10n.offerRendezvousInstructions(rendezvous)),
             ],
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _busy ? null : _shareMeetup,
+                icon: const Icon(Icons.shield_outlined),
+                label: Text(l10n.safetyShareMeetup),
+              ),
+            ),
           ],
         ),
       ),

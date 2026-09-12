@@ -18,6 +18,11 @@ REDIS_BIN="$TOOLING/redis-stable/src"
 REDIS_CONF="$TOOLING/redis.conf"
 REDIS_PORT=6379
 
+KAFKA_BIN="$TOOLING/kafka/bin"
+KAFKA_CONFIG="$TOOLING/kafka/config/kraft/server-local.properties"
+KAFKA_LOG_DIR="$TOOLING/kafka-data"
+KAFKA_PORT=9092
+
 FLUTTER_BIN="$TOOLING/flutter/bin/flutter"
 FLUTTER_PORT=8765
 FLUTTER_HOST=127.0.0.1
@@ -53,6 +58,22 @@ else
   "$REDIS_BIN/redis-server" "$REDIS_CONF" --daemonize yes --logfile "$TOOLING/redis.log"
 fi
 
+echo "==> Kafka ($KAFKA_PORT)"
+if "$KAFKA_BIN/kafka-broker-api-versions.sh" --bootstrap-server "localhost:$KAFKA_PORT" >/dev/null 2>&1; then
+  echo "already running"
+else
+  if [ ! -f "$KAFKA_LOG_DIR/meta.properties" ]; then
+    CLUSTER_ID="$("$KAFKA_BIN/kafka-storage.sh" random-uuid)"
+    "$KAFKA_BIN/kafka-storage.sh" format -t "$CLUSTER_ID" -c "$KAFKA_CONFIG"
+  fi
+  nohup "$KAFKA_BIN/kafka-server-start.sh" "$KAFKA_CONFIG" \
+    > "$TOOLING/kafka.log" 2>&1 & echo $! > "$PIDS/kafka.pid"
+  for _ in $(seq 1 30); do
+    "$KAFKA_BIN/kafka-broker-api-versions.sh" --bootstrap-server "localhost:$KAFKA_PORT" >/dev/null 2>&1 && break
+    sleep 1
+  done
+fi
+
 if [ "$BUILD" = true ]; then
   echo "==> Building all services"
   (cd "$ROOT" && npm run build)
@@ -73,7 +94,13 @@ for svc in "${SERVICES[@]}"; do
     echo "$svc already running (pid $(cat "$pidfile"))"
     continue
   fi
-  (cd "$ROOT/services/$svc" && nohup node dist/main.js > "$LOGS/$svc.log" 2>&1 & echo $! > "$pidfile")
+  # `exec` replaces the subshell's own process image with node, so `$!` below is
+  # node's real pid — without it, `$!` is the wrapper subshell's pid, and stop.sh
+  # killing that pid leaves the actual node process orphaned and still holding the
+  # port (confirmed live: repeated EADDRINUSE on restart before this fix).
+  (cd "$ROOT/services/$svc" && exec env EVENT_BUS_DRIVER=kafka KAFKA_BROKERS="localhost:$KAFKA_PORT" \
+    nohup node dist/main.js > "$LOGS/$svc.log" 2>&1) & echo $! > "$pidfile"
+  disown
   echo "$svc started (pid $(cat "$pidfile"), log $LOGS/$svc.log)"
 done
 

@@ -102,7 +102,14 @@ class _EntitlementsScreenState extends State<EntitlementsScreen> {
                                 style: Theme.of(context).textTheme.labelLarge,
                               ),
                               Text(
-                                '${_entitlements!.remainingFreeAllowanceThisMonth}',
+                                // Convergence T136: the backend sends `null` for this
+                                // once a subscription is active — the free-allowance
+                                // concept doesn't apply while it covers unlimited
+                                // publishing (a real crash here, found by T136's E2E
+                                // test, is what surfaced this in the first place).
+                                _entitlements!.hasActiveSubscription
+                                    ? l10n.entitlementsUnlimitedSubscribed
+                                    : '${_entitlements!.remainingFreeAllowanceThisMonth}',
                                 style:
                                     Theme.of(context).textTheme.headlineMedium,
                               ),

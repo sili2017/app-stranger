@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import Redis from 'ioredis';
-import { DomainEvent, EventIdempotencyGuard, RedisEventBus } from '@stranger/ts-platform';
+import { DomainEvent, EventIdempotencyGuard, createEventBus } from '@stranger/ts-platform';
 import { PrismaService } from '../prisma.service';
 
 const CONSUMER_NAME = 'offer-interest-count';
@@ -15,7 +15,7 @@ const CONSUMER_NAME = 'offer-interest-count';
 @Injectable()
 export class InterestCountConsumer implements OnModuleInit {
   private readonly redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
-  private readonly eventBus = new RedisEventBus(this.redisUrl);
+  private readonly eventBus = createEventBus(this.redisUrl, 'offer');
   private readonly idempotency = new EventIdempotencyGuard(new Redis(this.redisUrl));
 
   constructor(private readonly prisma: PrismaService) {}

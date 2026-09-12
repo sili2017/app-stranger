@@ -11,6 +11,7 @@ import { SubscriptionsService } from './subscriptions.service';
 import { SubscriptionsController } from './subscriptions.controller';
 import { PurchasesService } from './purchases.service';
 import { PurchasesController } from './purchases.controller';
+import { StripeWebhookController } from './payment-webhook/stripe-webhook.controller';
 
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }])],
@@ -19,6 +20,7 @@ import { PurchasesController } from './purchases.controller';
     EntitlementsController,
     SubscriptionsController,
     PurchasesController,
+    StripeWebhookController,
   ],
   providers: [
     PrismaService,
