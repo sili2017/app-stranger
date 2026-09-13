@@ -1,7 +1,8 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import Redis from 'ioredis';
-import { DomainEvent, EventIdempotencyGuard, createEventBus } from '@stranger/ts-platform';
+import { DomainEvent, EventIdempotencyGuard } from '@stranger/ts-platform';
 import { OffersService } from './offers.service';
+import { OfferEventBus } from '../events/offer-event-bus';
 
 const CONSUMER_NAME = 'offer-moderation-decision';
 
@@ -15,13 +16,15 @@ const CONSUMER_NAME = 'offer-moderation-decision';
 @Injectable()
 export class ModerationDecisionConsumer implements OnModuleInit {
   private readonly redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
-  private readonly eventBus = createEventBus(this.redisUrl, 'offer');
   private readonly idempotency = new EventIdempotencyGuard(new Redis(this.redisUrl));
 
-  constructor(private readonly offers: OffersService) {}
+  constructor(
+    private readonly offers: OffersService,
+    private readonly offerEventBus: OfferEventBus,
+  ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.eventBus.subscribe<Record<string, unknown>>('trust.moderation-decisioned', (e) =>
+    await this.offerEventBus.bus.subscribe<Record<string, unknown>>('trust.moderation-decisioned', (e) =>
       this.guarded(e, () => this.onModerationDecisioned(e)),
     );
   }

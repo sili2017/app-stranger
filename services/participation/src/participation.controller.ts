@@ -39,6 +39,13 @@ export class ParticipationController {
     return this.participation.listExpressionsOfInterest(offerId, principal(req));
   }
 
+  /** Recipient-only: whether *this* caller already expressed interest on this offer. */
+  @Get('expressions-of-interest/mine')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  async getMyExpressionOfInterest(@Param('offerId') offerId: string, @Req() req: Request) {
+    return this.participation.getMyExpressionOfInterest(offerId, principal(req));
+  }
+
   /** Creator sees every selection on the offer; a recipient sees only their own. */
   @Get('selections/mine')
   @Throttle({ default: { limit: 60, ttl: 60_000 } })

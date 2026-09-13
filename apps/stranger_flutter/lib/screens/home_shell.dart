@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../layout/responsive.dart';
+import '../state/app_state.dart';
 import 'feed_screen.dart';
 import 'publish_screen.dart';
 import 'my_offers_screen.dart';
@@ -38,6 +41,52 @@ class _HomeShellState extends State<HomeShell> {
     ProfileScreen(),
   ];
 
+  // Chats is index 3 — the only nav destination that currently carries a badge.
+  static const _chatsTabIndex = 3;
+
+  int _unreadCount = 0;
+  Timer? _unreadPollTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnreadCount();
+    _unreadPollTimer =
+        Timer.periodic(const Duration(seconds: 5), (_) => _loadUnreadCount());
+  }
+
+  @override
+  void dispose() {
+    _unreadPollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final count = await context.read<AppState>().messaging.getUnreadCount();
+      if (mounted) setState(() => _unreadCount = count);
+    } catch (_) {
+      // Best-effort — a failed unread-count fetch shouldn't block the shell itself.
+    }
+  }
+
+  Widget _navIcon(int index, IconData icon) {
+    if (index != _chatsTabIndex) return Icon(icon);
+    return Badge(
+      label: Text('$_unreadCount'),
+      isLabelVisible: _unreadCount > 0,
+      child: Icon(icon),
+    );
+  }
+
+  void _selectTab(int index) {
+    setState(() => _index = index);
+    // Refresh immediately on every switch (not just to/from Chats) rather than waiting
+    // for the next 5s poll tick — e.g. leaving Chats after reading messages there
+    // should clear the badge right away.
+    _loadUnreadCount();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -61,12 +110,12 @@ class _HomeShellState extends State<HomeShell> {
         body: body,
         bottomNavigationBar: NavigationBar(
           selectedIndex: _index,
-          onDestinationSelected: (i) => setState(() => _index = i),
+          onDestinationSelected: _selectTab,
           destinations: List.generate(
             _icons.length,
             (i) => NavigationDestination(
-              icon: Icon(_icons[i].icon),
-              selectedIcon: Icon(_icons[i].selectedIcon),
+              icon: _navIcon(i, _icons[i].icon),
+              selectedIcon: _navIcon(i, _icons[i].selectedIcon),
               label: labels[i],
             ),
           ),
@@ -79,7 +128,7 @@ class _HomeShellState extends State<HomeShell> {
         children: [
           NavigationRail(
             selectedIndex: _index,
-            onDestinationSelected: (i) => setState(() => _index = i),
+            onDestinationSelected: _selectTab,
             // NavigationRail asserts labelType is null/none whenever extended is true
             // (an extended rail always shows labels inline) — setting both unconditionally
             // threw on first render at desktop width.
@@ -90,8 +139,8 @@ class _HomeShellState extends State<HomeShell> {
             destinations: List.generate(
               _icons.length,
               (i) => NavigationRailDestination(
-                icon: Icon(_icons[i].icon),
-                selectedIcon: Icon(_icons[i].selectedIcon),
+                icon: _navIcon(i, _icons[i].icon),
+                selectedIcon: _navIcon(i, _icons[i].selectedIcon),
                 label: Text(labels[i]),
               ),
             ),

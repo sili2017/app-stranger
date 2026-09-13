@@ -34,16 +34,22 @@ export class ParticipationService {
     }
 
     const created = await this.prisma.$transaction(async (tx) => {
-      const row = await tx.expressionOfInterest.upsert({
+      const existing = await tx.expressionOfInterest.findUnique({
         where: { offerId_recipientUserId: { offerId, recipientUserId } },
-        create: { offerId, recipientUserId, message },
-        update: {}, // a retried request is idempotent by (offerId, recipientUserId)
       });
-      await this.events.interestExpressed(
-        tx as unknown as PrismaService,
-        { offerId, expressionOfInterestId: row.id, recipientUserId, hasMessage: !!message },
-        correlationId,
-      );
+      const row =
+        existing ??
+        (await tx.expressionOfInterest.create({ data: { offerId, recipientUserId, message } }));
+      // A retried request is idempotent by (offerId, recipientUserId) — only emit the
+      // domain event on genuine creation, not on a no-op replay, or interestCount (Offer,
+      // Discovery & Location) and the creator's notification both double up per retry.
+      if (!existing) {
+        await this.events.interestExpressed(
+          tx as unknown as PrismaService,
+          { offerId, expressionOfInterestId: row.id, recipientUserId, hasMessage: !!message },
+          correlationId,
+        );
+      }
       return row;
     });
 
@@ -156,6 +162,18 @@ export class ParticipationService {
       createdAt: row.createdAt,
       selected: !!row.selection && row.selection.outcome !== 'cancelled',
     }));
+  }
+
+  /**
+   * Backs `GET /offers/:offerId/expressions-of-interest/mine` — lets a recipient learn
+   * whether they already expressed interest, independent of any single client session,
+   * so a button state (e.g. "Interest sent") survives a screen revisit or app restart.
+   */
+  async getMyExpressionOfInterest(offerId: string, callerUserId: string) {
+    const row = await this.prisma.expressionOfInterest.findUnique({
+      where: { offerId_recipientUserId: { offerId, recipientUserId: callerUserId } },
+    });
+    return { expressed: !!row };
   }
 
   /**

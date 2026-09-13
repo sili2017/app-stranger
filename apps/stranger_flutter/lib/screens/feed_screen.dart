@@ -9,8 +9,8 @@ import '../state/app_state.dart';
 import '../widgets/async_state_views.dart';
 import '../widgets/feed_item_card.dart';
 import '../widgets/location_rationale.dart';
+import '../widgets/notification_bell.dart';
 import 'city_interests_screen.dart';
-import 'notifications_screen.dart';
 import 'offer_detail_screen.dart';
 
 /// Story 2: a recipient with a matching city interest and a current location within
@@ -32,31 +32,18 @@ class _FeedScreenState extends State<FeedScreen> {
   // True when the fallback location banner should show as the last-known-location
   // variant rather than the fully-unavailable variant; null means no banner at all.
   bool? _locationIsFallback;
-  int _notificationCount = 0;
   Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _refresh();
-    _loadNotificationCount();
     // Discovery eligibility (new offers, new city interests) is built asynchronously
     // from domain events (see discovery-location's EventConsumersService) — a one-shot
     // refresh can race ahead of that propagation. Poll like ChatScreen/OfferDetailScreen
     // already do, so a nearby offer appears without the user needing to pull-to-refresh.
     _pollTimer = Timer.periodic(
         const Duration(seconds: 5), (_) => _refresh(silent: true));
-  }
-
-  Future<void> _loadNotificationCount() async {
-    try {
-      final notifications =
-          await context.read<AppState>().notifications.listInApp();
-      if (!mounted) return;
-      setState(() => _notificationCount = notifications.length);
-    } catch (_) {
-      // Best-effort — a failed notification-count fetch shouldn't block the feed itself.
-    }
   }
 
   @override
@@ -125,25 +112,7 @@ class _FeedScreenState extends State<FeedScreen> {
       appBar: AppBar(
         title: Text(l10n.feedTitle),
         actions: [
-          // Convergence T134 (ADQ-008, WCAG 2.1 AA): axe-core flagged this button as
-          // having no accessible name — Badge wrapping the icon appears to interfere
-          // with IconButton's usual tooltip-to-semantics-label behavior on web. An
-          // explicit outer Semantics label fixes it regardless of Badge's own behavior.
-          Semantics(
-            label: l10n.notificationsTooltip,
-            child: IconButton(
-              icon: Badge(
-                label: Text('$_notificationCount'),
-                isLabelVisible: _notificationCount > 0,
-                child: const Icon(Icons.notifications_outlined),
-              ),
-              tooltip: l10n.notificationsTooltip,
-              onPressed: () => Navigator.of(context)
-                  .push(MaterialPageRoute(
-                      builder: (_) => const NotificationsScreen()))
-                  .then((_) => _loadNotificationCount()),
-            ),
-          ),
+          const NotificationBell(),
           IconButton(
             icon: const Icon(Icons.location_city_outlined),
             tooltip: l10n.cityInterestsTitle,

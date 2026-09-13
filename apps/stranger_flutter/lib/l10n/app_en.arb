@@ -116,6 +116,8 @@
   "offerMessageLabel": "Message (optional)",
   "offerImInterested": "I'm interested",
   "offerInterestSent": "Interest sent — you'll see a chat here if selected.",
+  "offerInterestSentLabel": "Interest sent ❤️",
+  "offerChatNotReadyYet": "Chat is being set up — check the Chats tab shortly.",
 
   "myOffersTitle": "My offers",
   "myOffersEmpty": "You haven't published any offers yet.",

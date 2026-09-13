@@ -22,4 +22,15 @@ class MessagingApi {
         .post('/conversations/$chatId/messages', body: {'body': body});
     return ChatMessage.fromJson(json as Map<String, dynamic>);
   }
+
+  /// Marks this chat read-up-to-now for the caller — call when a chat is opened.
+  Future<void> markRead(String chatId) =>
+      _client.post('/conversations/$chatId/read');
+
+  /// Total unread message count across every chat the caller is in — one number for
+  /// the Chats-tab badge, not per-chat.
+  Future<int> getUnreadCount() async {
+    final json = await _client.get('/conversations/unread-count');
+    return (json as Map<String, dynamic>)['unreadCount'] as int;
+  }
 }

@@ -24,8 +24,22 @@ export class FakePrismaService {
       void where;
       return row;
     },
+    create: async ({ data }: any) => {
+      const id = `eoi-${this.nextId++}`;
+      const row = { id, ...data, createdAt: new Date() };
+      this.eoiById.set(id, row);
+      this.eoiByKey.set(`${data.offerId}:${data.recipientUserId}`, id);
+      return row;
+    },
     findUnique: async ({ where, include }: any) => {
-      const row = this.eoiById.get(where.id);
+      let row: any;
+      if (where.offerId_recipientUserId) {
+        const { offerId, recipientUserId } = where.offerId_recipientUserId;
+        const existingId = this.eoiByKey.get(`${offerId}:${recipientUserId}`);
+        row = existingId ? this.eoiById.get(existingId) : undefined;
+      } else {
+        row = this.eoiById.get(where.id);
+      }
       if (!row) return null;
       if (include?.selection) {
         const selection = [...this.selections.values()].find(

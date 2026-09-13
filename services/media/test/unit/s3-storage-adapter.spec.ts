@@ -47,4 +47,17 @@ describe('S3StorageAdapter', () => {
     expect(getSignedUrl).toHaveBeenCalledWith(client, expect.any(GetObjectCommand), { expiresIn: 300 });
     expect(url).toBe('https://signed.example.com/photo.jpg');
   });
+
+  it('get() sends a GetObjectCommand and buffers the streamed body (Feature 25)', async () => {
+    async function* body() {
+      yield Buffer.from('hel');
+      yield Buffer.from('lo');
+    }
+    send.mockResolvedValue({ Body: body() });
+
+    const bytes = await adapter.get('users/1/photo.jpg');
+
+    expect(GetObjectCommand).toHaveBeenCalledWith({ Bucket: bucket, Key: 'users/1/photo.jpg' });
+    expect(bytes).toEqual(Buffer.from('hello'));
+  });
 });

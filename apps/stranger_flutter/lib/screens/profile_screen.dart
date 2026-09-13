@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../layout/responsive.dart';
 import '../models/profile.dart';
 import '../state/app_state.dart';
 import '../widgets/async_state_views.dart';
+import '../widgets/profile_avatar.dart';
 import 'city_interests_screen.dart';
 import 'edit_profile_screen.dart';
 import 'entitlements_screen.dart';
@@ -25,6 +27,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   PublicProfile? _profile;
   Object? _error;
+  bool _uploadingPhoto = false;
 
   @override
   void initState() {
@@ -42,6 +45,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e);
+    }
+  }
+
+  /// Feature 25: reuses verification_screen.dart's exact pick-upload-attach pattern —
+  /// submitPhotoVerification already sets PublicProfile.photoAssetId as a side effect
+  /// (see that endpoint's own doc comment: "voluntary re-verification photo from
+  /// Profile... immediately reflects on the public profile"), so no new backend
+  /// endpoint is needed to persist the picture itself.
+  Future<void> _pickAndUploadPhoto() async {
+    final picked =
+        await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    setState(() => _uploadingPhoto = true);
+    final appState = context.read<AppState>();
+    try {
+      final asset = await appState.media.upload(
+        filename: 'profile-photo.jpg',
+        contentType: 'image/jpeg',
+        bytes: bytes,
+      );
+      await appState.identity.submitPhotoVerification(asset.id);
+      await _load();
+    } catch (e) {
+      if (mounted) showErrorSnackBar(context, e);
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
     }
   }
 
@@ -103,9 +134,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            CircleAvatar(
-                radius: 36,
-                child: Text(userId.isEmpty ? '?' : userId[0].toUpperCase())),
+            Center(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ProfileAvatar(
+                    photoAssetId: _profile?.photoAssetId,
+                    fallbackText: userId.isEmpty ? '?' : userId[0].toUpperCase(),
+                  ),
+                  Positioned(
+                    right: -4,
+                    bottom: -4,
+                    child: Material(
+                      color: Theme.of(context).colorScheme.primary,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: _uploadingPhoto ? null : _pickAndUploadPhoto,
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: _uploadingPhoto
+                              ? SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color:
+                                        Theme.of(context).colorScheme.onPrimary,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.camera_alt_outlined,
+                                  size: 16,
+                                  color: Theme.of(context).colorScheme.onPrimary,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 12),
             Text(userId,
                 textAlign: TextAlign.center,

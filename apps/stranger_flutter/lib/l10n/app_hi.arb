@@ -116,6 +116,8 @@
   "offerMessageLabel": "संदेश (वैकल्पिक)",
   "offerImInterested": "मुझे रुचि है",
   "offerInterestSent": "रुचि भेजी गई — चुने जाने पर आपको यहाँ एक चैट दिखेगी।",
+  "offerInterestSentLabel": "रुचि भेजी गई ❤️",
+  "offerChatNotReadyYet": "चैट तैयार की जा रही है — कृपया थोड़ी देर में चैट्स टैब देखें।",
 
   "myOffersTitle": "मेरे ऑफ़र",
   "myOffersEmpty": "आपने अभी तक कोई ऑफ़र प्रकाशित नहीं किया है।",

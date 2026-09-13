@@ -6,6 +6,7 @@ import '../layout/responsive.dart';
 import '../models/offer.dart';
 import '../state/app_state.dart';
 import '../widgets/async_state_views.dart';
+import '../widgets/notification_bell.dart';
 import 'offer_detail_screen.dart';
 
 /// FR-012: creator-visible history of every offer they've published, including past
@@ -44,7 +45,10 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.myOffersTitle)),
+      appBar: AppBar(
+        title: Text(l10n.myOffersTitle),
+        actions: const [NotificationBell()],
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ResponsiveCenter(

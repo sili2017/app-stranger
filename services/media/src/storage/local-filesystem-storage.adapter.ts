@@ -26,6 +26,10 @@ export class LocalFilesystemStorageAdapter implements StorageAdapter {
     return `file://${this.resolve(key)}`;
   }
 
+  async get(key: string): Promise<Buffer> {
+    return fs.readFile(this.resolve(key));
+  }
+
   async delete(key: string): Promise<void> {
     await fs.rm(this.resolve(key), { force: true });
   }

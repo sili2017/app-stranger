@@ -29,6 +29,42 @@ export class MessagingController {
     return memberships.map((m) => m.chat);
   }
 
+  /** Feature 24: total unread MESSAGE count across every chat the caller is in — one
+   * number for the Chats-tab badge, not per-chat. Excludes the caller's own sent
+   * messages. Declared before the `:id` param routes below so this literal segment is
+   * never shadowed by them. */
+  @Get('conversations/unread-count')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  async getUnreadCount(@Req() req: Request) {
+    const userId = principal(req);
+    const memberships = await this.prisma.chatMembership.findMany({ where: { userId } });
+    let total = 0;
+    for (const m of memberships) {
+      total += await this.prisma.message.count({
+        where: {
+          chatId: m.chatId,
+          senderId: { not: userId },
+          ...(m.lastReadAt ? { createdAt: { gt: m.lastReadAt } } : {}),
+        },
+      });
+    }
+    return { unreadCount: total };
+  }
+
+  /** Feature 24: marks everything in this chat read-up-to-now for the caller — call
+   * when a chat is opened. */
+  @Post('conversations/:id/read')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  async markRead(@Param('id') chatId: string, @Req() req: Request) {
+    const userId = principal(req);
+    await this.assertMember(chatId, userId);
+    await this.prisma.chatMembership.update({
+      where: { chatId_userId: { chatId, userId } },
+      data: { lastReadAt: new Date() },
+    });
+    return { chatId };
+  }
+
   @Get('conversations/:id/messages')
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   async listMessages(@Param('id') chatId: string, @Req() req: Request) {

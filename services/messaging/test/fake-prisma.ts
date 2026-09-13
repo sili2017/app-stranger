@@ -15,6 +15,7 @@ export class FakePrismaService {
       this.chats.set(data.id, { ...data });
       return { ...data };
     },
+    findUnique: async ({ where }: any) => this.chats.get(where.id) ?? null,
     findMany: async ({ where }: any) =>
       [...this.chats.values()].filter(
         (c) =>
@@ -33,8 +34,18 @@ export class FakePrismaService {
   message = {
     create: async ({ data }: any) => {
       const id = `msg-${this.messages.size + 1}`;
-      this.messages.set(id, { id, ...data });
+      this.messages.set(id, { id, createdAt: new Date(), ...data });
       return { id, ...data };
+    },
+    count: async ({ where }: any) => {
+      return [...this.messages.values()].filter((m) => {
+        if (m.chatId !== where.chatId) return false;
+        if (where.senderId?.not !== undefined && m.senderId === where.senderId.not) return false;
+        if (where.createdAt?.gt && !(m.createdAt.getTime() > where.createdAt.gt.getTime())) {
+          return false;
+        }
+        return true;
+      }).length;
     },
     deleteMany: async ({ where }: any) => {
       let count = 0;
@@ -53,6 +64,27 @@ export class FakePrismaService {
       const id = `member-${this.memberships.size + 1}`;
       this.memberships.set(id, { id, ...data });
       return { id, ...data };
+    },
+    findUnique: async ({ where }: any) => {
+      const { chatId, userId } = where.chatId_userId;
+      return (
+        [...this.memberships.values()].find(
+          (m) => m.chatId === chatId && m.userId === userId,
+        ) ?? null
+      );
+    },
+    findMany: async ({ where }: any) =>
+      [...this.memberships.values()].filter((m) => m.userId === where.userId),
+    update: async ({ where, data }: any) => {
+      const { chatId, userId } = where.chatId_userId;
+      const existing = [...this.memberships.entries()].find(
+        ([, m]) => m.chatId === chatId && m.userId === userId,
+      );
+      if (!existing) throw new Error('membership not found');
+      const [id, row] = existing;
+      const updated = { ...row, ...data };
+      this.memberships.set(id, updated);
+      return updated;
     },
     deleteMany: async ({ where }: any) => {
       let count = 0;

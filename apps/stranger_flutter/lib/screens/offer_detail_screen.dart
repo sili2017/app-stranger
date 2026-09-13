@@ -6,9 +6,11 @@ import '../core/app_exception.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/status_labels.dart';
 import '../layout/responsive.dart';
+import '../models/chat.dart';
 import '../models/offer.dart';
 import '../state/app_state.dart';
 import '../widgets/async_state_views.dart';
+import 'chat_screen.dart';
 import 'entitlements_screen.dart';
 
 /// Story 3: a recipient expresses interest, the creator selects, the exact place is
@@ -30,6 +32,7 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
   Timer? _pollTimer;
   final _messageController = TextEditingController();
   bool _busy = false;
+  bool _alreadyInterested = false;
 
   @override
   void initState() {
@@ -57,15 +60,20 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
       final offer = await appState.offer.getOffer(widget.offerId);
       final place = await appState.offer.getExactPlace(widget.offerId);
       List<Map<String, dynamic>>? eois;
+      var alreadyInterested = _alreadyInterested;
       if (offer.creatorUserId == appState.userId) {
         eois = await appState.participation
             .listExpressionsOfInterest(widget.offerId);
+      } else {
+        alreadyInterested =
+            await appState.participation.hasExpressedInterest(widget.offerId);
       }
       if (!mounted) return;
       setState(() {
         _offer = offer;
         _place = place;
         _expressionsOfInterest = eois;
+        _alreadyInterested = alreadyInterested;
         _error = null;
       });
     } catch (e) {
@@ -84,6 +92,7 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
           );
       _messageController.clear();
       if (mounted) {
+        setState(() => _alreadyInterested = true);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(l10n.offerInterestSent)));
@@ -104,10 +113,52 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
           .participation
           .select(widget.offerId, eoiId);
       await _load();
+      if (mounted) await _navigateToChatWhenReady();
     } catch (e) {
       if (mounted) showErrorSnackBar(context, e);
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Chat creation is async (Messaging consumes participation.participant-selected —
+  /// see chat-creation.consumer.ts) so there's no chatId synchronously from select()
+  /// itself. Poll the caller's own conversation list, filtered by this offer, bounded,
+  /// with a non-blocking fallback if it isn't ready in time.
+  Future<void> _navigateToChatWhenReady() async {
+    final appState = context.read<AppState>();
+    final deadline = DateTime.now().add(const Duration(seconds: 15));
+    while (DateTime.now().isBefore(deadline)) {
+      try {
+        final chats = await appState.messaging.listConversations();
+        Chat? match;
+        for (final c in chats) {
+          if (c.offerId == widget.offerId) {
+            match = c;
+            break;
+          }
+        }
+        if (match != null && mounted) {
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              chatId: match!.id,
+              offerId: match.offerId,
+              title: _offer?.activityText ?? match.offerId,
+              isActive: match.isActive,
+            ),
+          ));
+          return;
+        }
+      } catch (_) {
+        // best-effort; retry until the deadline
+      }
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context)!.offerChatNotReadyYet)),
+      );
     }
   }
 
@@ -359,9 +410,13 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
         ),
         const SizedBox(height: 12),
         FilledButton.icon(
-          onPressed: _busy ? null : _expressInterest,
-          icon: const Icon(Icons.waving_hand_outlined),
-          label: Text(l10n.offerImInterested),
+          onPressed: (_busy || _alreadyInterested) ? null : _expressInterest,
+          icon: Icon(_alreadyInterested
+              ? Icons.favorite
+              : Icons.waving_hand_outlined),
+          label: Text(_alreadyInterested
+              ? l10n.offerInterestSentLabel
+              : l10n.offerImInterested),
         ),
       ],
     );

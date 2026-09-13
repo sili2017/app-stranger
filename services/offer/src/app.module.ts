@@ -12,6 +12,7 @@ import { ExpiryScheduler } from './offers/expiry-scheduler';
 import { OutboxRelayService } from './events/outbox-relay.service';
 import { InterestCountConsumer } from './offers/interest-count.consumer';
 import { ModerationDecisionConsumer } from './offers/moderation-decision.consumer';
+import { OfferEventBus } from './events/offer-event-bus';
 
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }])],
@@ -21,6 +22,7 @@ import { ModerationDecisionConsumer } from './offers/moderation-decision.consume
     OfferEventsProducer,
     PrismaOutboxRepository,
     OutboxRelayService,
+    OfferEventBus,
     InterestCountConsumer,
     ModerationDecisionConsumer,
     InternalClients,

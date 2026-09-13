@@ -22,6 +22,14 @@ class ParticipationApi {
     return json.cast<Map<String, dynamic>>();
   }
 
+  /// Recipient-only: whether the current user already expressed interest — lets a
+  /// button state (e.g. "Interest sent") survive a screen revisit or app restart.
+  Future<bool> hasExpressedInterest(String offerId) async {
+    final json =
+        await _client.get('/offers/$offerId/expressions-of-interest/mine');
+    return (json as Map<String, dynamic>)['expressed'] as bool;
+  }
+
   Future<Selection> select(
       String offerId, String expressionOfInterestId) async {
     final json = await _client.post(

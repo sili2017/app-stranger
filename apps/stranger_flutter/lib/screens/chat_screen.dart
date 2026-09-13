@@ -52,13 +52,17 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _load({bool silent = false}) async {
     try {
-      final messages =
-          await context.read<AppState>().messaging.listMessages(widget.chatId);
+      final messaging = context.read<AppState>().messaging;
+      final messages = await messaging.listMessages(widget.chatId);
       if (!mounted) return;
       setState(() {
         _messages = messages;
         _error = null;
       });
+      // Best-effort, fire-and-forget: clears this chat's contribution to the Chats-tab
+      // unread badge. Called on every load (not just initState) so a message arriving
+      // while the chat is already open is marked read too, not just on first open.
+      unawaited(messaging.markRead(widget.chatId).catchError((_) {}));
     } catch (e) {
       if (!mounted) return;
       if (!silent) setState(() => _error = e);

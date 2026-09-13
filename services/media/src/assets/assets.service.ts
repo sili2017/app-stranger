@@ -34,4 +34,15 @@ export class AssetsService {
 
     return { id: asset.id, contentType: asset.contentType, byteSize: asset.byteSize };
   }
+
+  /** Feature 25: backs GET /assets/:id/content — the profile-photo/verification-photo
+   * display gap (there was previously no way to read an uploaded asset back at all). */
+  async getContent(id: string): Promise<{ contentType: string; bytes: Buffer }> {
+    const asset = await this.prisma.asset.findUnique({ where: { id } });
+    if (!asset) {
+      throw new DomainError('ASSET_NOT_FOUND', 'errors.assetNotFound', HttpStatus.NOT_FOUND);
+    }
+    const bytes = await this.storage.get(asset.storageKey);
+    return { contentType: asset.contentType, bytes };
+  }
 }

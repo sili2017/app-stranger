@@ -54,6 +54,9 @@ model ChatMembership {
   chat     Chat     @relation(fields: [chatId], references: [id])
   userId   String
   joinedAt DateTime @default(now()) @db.Timestamptz(3)
+  /// Feature 24: unread-message-count support. Null means "never read" — every message
+  /// in the chat counts as unread for this member until they open it once.
+  lastReadAt DateTime? @db.Timestamptz(3)
 
   @@unique([chatId, userId])
   @@index([chatId])
