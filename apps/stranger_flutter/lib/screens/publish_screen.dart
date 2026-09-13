@@ -72,7 +72,7 @@ class _PublishScreenState extends State<PublishScreen> {
   double? _lng;
   int _lifetimeMinutes = 15;
   int _capacity = 3;
-  String _moneyLabel = 'split';
+  String _moneyLabel = 'creator_pays';
   bool _submitting = false;
   bool _locating = false;
 
@@ -167,6 +167,7 @@ class _PublishScreenState extends State<PublishScreen> {
         LocationFailureReason.insecureOrigin => l10n.feedLocationInsecureOrigin,
         LocationFailureReason.permissionDenied =>
           l10n.feedLocationPermissionDenied,
+        LocationFailureReason.timedOut => l10n.feedLocationTimedOut,
         _ => l10n.feedLocationError,
       };
       showErrorSnackBar(context, message);
@@ -517,21 +518,25 @@ class _PublishScreenState extends State<PublishScreen> {
                       value: 'byo', child: Text(l10n.publishMoneyByo)),
                   DropdownMenuItem(
                       value: 'split', child: Text(l10n.publishMoneySplit)),
-                  DropdownMenuItem(
-                      value: 'estimated_cost',
-                      child: Text(l10n.publishMoneyEstimated)),
+                  // Commented out for now — re-enable when estimated-cost input is
+                  // ready to collect an actual amount, not just this label.
+                  // DropdownMenuItem(
+                  //     value: 'estimated_cost',
+                  //     child: Text(l10n.publishMoneyEstimated)),
                 ],
-                onChanged: (v) => setState(() => _moneyLabel = v ?? 'split'),
+                onChanged: (v) =>
+                    setState(() => _moneyLabel = v ?? 'creator_pays'),
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _moneyNoteController,
-                decoration: InputDecoration(
-                  labelText: l10n.publishMoneyNoteLabel,
-                  hintText: l10n.publishMoneyNoteHint,
-                  border: const OutlineInputBorder(),
-                ),
-              ),
+              // Commented out for now, alongside the estimated-cost option above.
+              // const SizedBox(height: 12),
+              // TextFormField(
+              //   controller: _moneyNoteController,
+              //   decoration: InputDecoration(
+              //     labelText: l10n.publishMoneyNoteLabel,
+              //     hintText: l10n.publishMoneyNoteHint,
+              //     border: const OutlineInputBorder(),
+              //   ),
+              // ),
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: _submitting ? null : _publish,

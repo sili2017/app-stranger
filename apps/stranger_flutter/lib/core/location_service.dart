@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:geolocator/geolocator.dart';
 
 /// T117: platform-abstracted location acquisition. `geolocator`'s federated plugin
@@ -23,8 +25,18 @@ enum LocationFailureReason {
   insecureOrigin,
   permissionDenied,
   serviceDisabled,
+  timedOut,
   unavailable,
 }
+
+/// How long to wait for a fix before giving up — belt-and-braces alongside
+/// [Geolocator.getCurrentPosition]'s own `timeLimit`. Verified live (via CDP against
+/// this exact browser/origin) that a stalled OS-level location provider can leave the
+/// browser's `getCurrentPosition` never invoking either callback at all — not even its
+/// own explicit `timeout` option fires — so relying on the platform alone left the
+/// button spinning forever. This wraps the call in a plain Dart timer that always
+/// completes, regardless of what the platform does underneath.
+const _fixTimeout = Duration(seconds: 12);
 
 class LocationService {
   /// Set after a failed [getCurrentLocation] call (cleared at the start of the next
@@ -44,8 +56,8 @@ class LocationService {
     try {
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
-      );
+        timeLimit: _fixTimeout,
+      ).timeout(_fixTimeout + const Duration(seconds: 2));
       return LocationResult(
           lat: position.latitude, lng: position.longitude, isLiveFix: true);
     } catch (e) {
@@ -94,11 +106,17 @@ class LocationService {
   /// string (verified live via Chrome DevTools against this exact origin), so pattern
   /// match on it rather than a `code`, which is also `1` for a real permission denial.
   void _recordFailureReason(Object e) {
+    if (e is TimeoutException) {
+      lastFailureReason = LocationFailureReason.timedOut;
+      return;
+    }
     final message = e.toString().toLowerCase();
     if (message.contains('secure origin')) {
       lastFailureReason = LocationFailureReason.insecureOrigin;
     } else if (message.contains('denied')) {
       lastFailureReason = LocationFailureReason.permissionDenied;
+    } else if (message.contains('timeout')) {
+      lastFailureReason = LocationFailureReason.timedOut;
     } else {
       lastFailureReason ??= LocationFailureReason.unavailable;
     }
