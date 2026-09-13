@@ -51,6 +51,12 @@ echo "==> Flutter web"
 stop_pidfile "flutter-web" "$PIDS/flutter-web.pid"
 kill_port 8765 # flutter run's dart child can outlive the tracked pid
 
+echo "==> cloudflared tunnel"
+stop_pidfile "cloudflared" "$PIDS/cloudflared.pid"
+
+echo "==> Mobile proxy"
+stop_pidfile "mobile-proxy" "$PIDS/mobile-proxy.pid"
+
 echo "==> Backend services"
 for svc in "${SERVICES[@]}"; do
   stop_pidfile "$svc" "$PIDS/$svc.pid"

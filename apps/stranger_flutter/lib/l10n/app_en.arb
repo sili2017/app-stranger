@@ -73,8 +73,6 @@
   "publishUseCurrentLocation": "Use current location",
   "publishLocationSet": "Location set ({lat}, {lng})",
   "@publishLocationSet": {"placeholders": {"lat": {"type": "String"}, "lng": {"type": "String"}}},
-  "publishLatLabel": "Lat (manual override)",
-  "publishLngLabel": "Lng (manual override)",
   "publishRendezvousLabel": "Rendezvous instruction (required for a moving spot)",
   "publishLifetimeLabel": "Lifetime: {minutes} minutes",
   "@publishLifetimeLabel": {"placeholders": {"minutes": {"type": "int"}}},

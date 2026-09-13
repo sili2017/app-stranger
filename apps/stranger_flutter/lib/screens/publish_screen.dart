@@ -433,36 +433,6 @@ class _PublishScreenState extends State<PublishScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      decoration: InputDecoration(
-                        labelText: l10n.publishLatLabel,
-                        border: const OutlineInputBorder(),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true, signed: true),
-                      initialValue: _lat?.toString(),
-                      onChanged: (v) => _lat = double.tryParse(v),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextFormField(
-                      decoration: InputDecoration(
-                        labelText: l10n.publishLngLabel,
-                        border: const OutlineInputBorder(),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true, signed: true),
-                      initialValue: _lng?.toString(),
-                      onChanged: (v) => _lng = double.tryParse(v),
-                    ),
-                  ),
-                ],
-              ),
               if (_requiresRendezvous) ...[
                 const SizedBox(height: 12),
                 TextFormField(

@@ -57,3 +57,17 @@ if lsof -ti tcp:8765 -sTCP:LISTEN >/dev/null 2>&1; then
 else
   printf "%-22s %-8s %s\n" "flutter-web" "8765" "down"
 fi
+
+MOBILE_PROXY_PORT="${MOBILE_PROXY_PORT:-8090}"
+if lsof -ti tcp:"$MOBILE_PROXY_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  printf "%-22s %-8s %s\n" "mobile-proxy" "$MOBILE_PROXY_PORT" "up"
+else
+  printf "%-22s %-8s %s\n" "mobile-proxy" "$MOBILE_PROXY_PORT" "down"
+fi
+
+if pgrep -f "cloudflared tunnel" >/dev/null 2>&1; then
+  url="$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$TOOLING/logs/cloudflared.log" 2>/dev/null | tail -1)"
+  printf "%-22s %-8s %s\n" "cloudflared" "-" "up (${url:-url pending})"
+else
+  printf "%-22s %-8s %s\n" "cloudflared" "-" "down"
+fi

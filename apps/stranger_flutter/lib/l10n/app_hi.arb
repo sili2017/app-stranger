@@ -73,8 +73,6 @@
   "publishUseCurrentLocation": "वर्तमान स्थान का उपयोग करें",
   "publishLocationSet": "स्थान सेट ({lat}, {lng})",
   "@publishLocationSet": {"placeholders": {"lat": {"type": "String"}, "lng": {"type": "String"}}},
-  "publishLatLabel": "अक्षांश (मैन्युअल ओवरराइड)",
-  "publishLngLabel": "देशांतर (मैन्युअल ओवरराइड)",
   "publishRendezvousLabel": "मिलन स्थल निर्देश (गतिशील स्थान के लिए आवश्यक)",
   "publishLifetimeLabel": "अवधि: {minutes} मिनट",
   "@publishLifetimeLabel": {"placeholders": {"minutes": {"type": "int"}}},
