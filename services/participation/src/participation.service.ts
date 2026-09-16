@@ -28,6 +28,15 @@ export class ParticipationService {
       throw new DomainError('OFFER_NOT_ACTIVE', 'errors.offerNotActive', HttpStatus.CONFLICT);
     }
 
+    // Item 32: a creator can't express interest in their own offer. Discovery &
+    // Location's eligibility rule already excludes a creator from their own offer's
+    // candidate pool (belt), but that's a separate service call — this check keeps the
+    // rule enforced here too (suspenders) rather than relying solely on that call never
+    // drifting or being bypassed.
+    if (offer.creatorUserId === recipientUserId) {
+      throw new DomainError('NOT_ELIGIBLE', 'errors.notEligible', HttpStatus.FORBIDDEN);
+    }
+
     const eligible = await this.internal.isEligibleRecipient(offerId, recipientUserId);
     if (!eligible) {
       throw new DomainError('NOT_ELIGIBLE', 'errors.notEligible', HttpStatus.FORBIDDEN);

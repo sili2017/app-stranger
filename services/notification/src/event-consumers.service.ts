@@ -57,15 +57,20 @@ export class EventConsumersService implements OnModuleInit {
     await handler();
   }
 
-  /** Alerts the creator that someone expressed interest. */
+  /** Alerts the creator that a named recipient expressed interest. */
   private async onInterestExpressed(event: DomainEvent): Promise<void> {
     const d = event.data as Record<string, unknown>;
     const offerId = String(d.offerId);
-    const creatorUserId = await this.internal.getOfferCreator(offerId);
+    const recipientUserId = String(d.recipientUserId);
+    const [creatorUserId, interestedUserName] = await Promise.all([
+      this.internal.getOfferCreator(offerId),
+      this.internal.getUserFirstName(recipientUserId),
+    ]);
     if (!creatorUserId) return;
     await this.notifications.queue(creatorUserId, 'participation.interest-expressed', {
       offerId,
       hasMessage: d.hasMessage,
+      interestedUserName: interestedUserName ?? undefined,
     });
   }
 

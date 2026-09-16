@@ -98,6 +98,12 @@ model MeetOffer {
 
   createdAt DateTime @updatedAt @db.Timestamptz(3)
 
+  /// Item 31: the creator's own "delete" — hides the offer from their history (My
+  /// Offers) without removing the row, since other services (participation/messaging/
+  /// notification) still reference this offerId for an already-selected recipient's
+  /// chat, ratings, etc. Null means visible; set means hidden from the creator only.
+  hiddenAt DateTime? @db.Timestamptz(3)
+
   @@index([status])
   @@index([creatorUserId])
 }

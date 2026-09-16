@@ -212,6 +212,33 @@ export class OffersService {
     return true;
   }
 
+  /**
+   * Item 31: Creator-only cleanup of a past offer (FR-012 declutter) — an offer still
+   * `active` must be stopped first, matching `stop()`'s own creator-and-status checks.
+   * Soft delete, not a real row removal: a recipient with an accepted Selection still
+   * has a live chat/rating/notification history keyed on this offerId in other
+   * services, so the row stays — this only sets `hiddenAt`, which `listForCreator`
+   * filters on. Internal cross-service lookups (internal.controller.ts) query
+   * MeetOffer directly and intentionally ignore `hiddenAt`, so nothing downstream
+   * breaks just because the creator hid it from their own history.
+   */
+  async delete(offerId: string, callerUserId: string): Promise<void> {
+    const offer = await this.prisma.meetOffer.findUnique({ where: { id: offerId } });
+    if (!offer) {
+      throw new DomainError('OFFER_NOT_FOUND', 'errors.offerNotFound', HttpStatus.NOT_FOUND);
+    }
+    if (offer.creatorUserId !== callerUserId) {
+      throw new DomainError('UNAUTHORIZED', 'errors.unauthorized', HttpStatus.FORBIDDEN);
+    }
+    if (offer.status === 'active') {
+      throw new DomainError('OFFER_ACTIVE', 'errors.offerActiveCannotDelete', HttpStatus.CONFLICT);
+    }
+    await this.prisma.meetOffer.update({
+      where: { id: offerId },
+      data: { hiddenAt: new Date() },
+    });
+  }
+
   /** T049: interestCount live while active (FR-042). */
   async getById(offerId: string) {
     const offer = await this.prisma.meetOffer.findUnique({ where: { id: offerId } });
@@ -221,10 +248,14 @@ export class OffersService {
     return offer;
   }
 
-  /** T050 (history half): creator-visible past-offer history (FR-012). */
+  /**
+   * T050 (history half): creator-visible past-offer history (FR-012). Excludes
+   * anything the creator has hidden via `delete()` (item 31) — hidden rows still
+   * exist, just never surface here.
+   */
   async listForCreator(creatorUserId: string) {
     return this.prisma.meetOffer.findMany({
-      where: { creatorUserId },
+      where: { creatorUserId, hiddenAt: null },
       orderBy: { publishedAt: 'desc' },
     });
   }

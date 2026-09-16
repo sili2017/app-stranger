@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { OffersService } from './offers.service';
@@ -35,6 +35,13 @@ export class OffersController {
   @HttpCode(200)
   async stop(@Param('id') id: string, @Req() req: Request) {
     return this.offers.stop(id, principal(req), correlation(req));
+  }
+
+  /** Creator-only cleanup of a past offer — an active offer must be stopped first. */
+  @Delete(':id')
+  @HttpCode(204)
+  async delete(@Param('id') id: string, @Req() req: Request) {
+    await this.offers.delete(id, principal(req));
   }
 
   @Get(':id')

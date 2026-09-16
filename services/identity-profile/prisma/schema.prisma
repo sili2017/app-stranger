@@ -42,8 +42,19 @@ enum AccountStatus {
   disabled
 }
 
+/// Item 30: how this account was registered. `dev` is the pre-existing x-dev-user-id
+/// stand-in (seed scripts, manual testing) — every real account is one of the other four.
+enum AuthProviderKind {
+  dev
+  email
+  google
+  facebook
+  apple
+}
+
 /// Highly Restricted: dateOfBirth never appears in an API response or event
-/// (data-model.md Sensitive-Data Classification).
+/// (data-model.md Sensitive-Data Classification). passwordHash is Highly Restricted
+/// for the same reason and never appears in a response either.
 model UserAccount {
   id                 String             @id @default(uuid())
   dateOfBirth        DateTime           @db.Timestamptz(3)
@@ -52,10 +63,23 @@ model UserAccount {
   createdAt          DateTime           @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime           @updatedAt @db.Timestamptz(3)
 
+  /// Item 30.1: registration method. `email`+`passwordHash` are set for an `email`
+  /// account; `oauthSubject` (the provider's own stable user id) is set for
+  /// google/facebook/apple. Never both — a account is exactly one of the two.
+  authProvider AuthProviderKind @default(dev)
+  email        String?          @unique
+  passwordHash String?
+  oauthSubject String?
+
   publicProfile     PublicProfile?
   registeredAddress RegisteredAddress?
   verificationCases VerificationCase[]
   cityInterests     CityInterest[]
+
+  // A given provider's subject id maps to exactly one account. Nullable columns don't
+  // collide under a Postgres unique index (NULLs are never equal to each other), so
+  // this only constrains the email/google/facebook/apple rows that actually set it.
+  @@unique([authProvider, oauthSubject])
 }
 
 enum ProfileVerificationStatus {

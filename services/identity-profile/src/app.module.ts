@@ -13,6 +13,8 @@ import { RatingSummaryConsumer } from './events/rating-summary.consumer';
 import { AuditLogService } from './audit/audit-log.service';
 import { ProfilesController } from './profiles/profiles.controller';
 import { ProfilesService } from './profiles/profiles.service';
+import { AuthController } from './auth/auth.controller';
+import { AuthService } from './auth/auth.service';
 
 @Module({
   imports: [ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }])],
@@ -22,6 +24,7 @@ import { ProfilesService } from './profiles/profiles.service';
     AppealDecisionsController,
     CityInterestsController,
     ProfilesController,
+    AuthController,
   ],
   providers: [
     PrismaService,
@@ -33,6 +36,7 @@ import { ProfilesService } from './profiles/profiles.service';
     VerificationService,
     CityInterestsService,
     ProfilesService,
+    AuthService,
   ],
 })
 export class AppModule {}

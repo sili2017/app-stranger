@@ -100,6 +100,11 @@ export class EligibilityService {
     const results: EligibleOffer[] = [];
 
     for (const offer of candidates) {
+      // Item 32: a creator is never a candidate recipient for their own offer — without
+      // this they'd routinely see (and could express interest in) it themselves, since
+      // they're trivially "nearby" having just published it from where they're standing.
+      if (offer.creatorUserId === recipientUserId) continue;
+
       const offerPoint = decodeGeohash(offer.placeGeohash);
       const distanceKm = haversineKm(location, offerPoint);
       if (distanceKm > eligibilityRadiusKm(offer.cityId)) continue;

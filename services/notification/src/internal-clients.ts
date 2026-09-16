@@ -7,12 +7,25 @@ export class InternalClients {
   private readonly participationBaseUrl =
     process.env.PARTICIPATION_BASE_URL ?? 'http://localhost:3004';
   private readonly discoveryBaseUrl = process.env.DISCOVERY_BASE_URL ?? 'http://localhost:3003';
+  private readonly identityBaseUrl = process.env.IDENTITY_BASE_URL ?? 'http://localhost:3001';
 
   async getOfferCreator(offerId: string): Promise<string | null> {
     const body = (await this.getWithTimeout(
       `${this.offerBaseUrl}/internal/v1/offers/${offerId}/status`,
     )) as { creatorUserId?: string };
     return body?.creatorUserId ?? null;
+  }
+
+  /** Display name for a notification body — best-effort, falls back to null on any failure. */
+  async getUserFirstName(userId: string): Promise<string | null> {
+    try {
+      const body = (await this.getWithTimeout(
+        `${this.identityBaseUrl}/profiles/${userId}`,
+      )) as { firstName?: string };
+      return body?.firstName ?? null;
+    } catch {
+      return null;
+    }
   }
 
   /** Convergence T125 (FR-006): recipients eligible for a just-published offer. */
