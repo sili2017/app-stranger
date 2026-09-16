@@ -11,9 +11,25 @@ import { VerifiedPrincipal } from './verified-principal';
  * service verifies it via createAuthMiddleware without knowing anything about how the
  * credential was originally proven.
  */
-const secret = new TextEncoder().encode(
-  process.env.AUTH_JWT_SECRET ?? 'dev-only-shared-secret-change-me',
-);
+const DEV_SENTINEL_SECRET = 'dev-only-shared-secret-change-me';
+
+// ultrareview finding: the dev-sentinel fallback is a repo-public constant — anyone
+// who's read this file can forge a valid session token for any userId against it, and
+// nothing was stopping a real deployment from silently shipping with it. AUTH_PROVIDER
+// is only ever set to `oidc` for exactly that "not just my laptop" case (see
+// auth-middleware-factory.ts), so that's the signal used to require a real secret —
+// unset/unchanged here now fails loudly at startup instead of at someone's audit.
+if (
+  process.env.AUTH_PROVIDER === 'oidc' &&
+  (!process.env.AUTH_JWT_SECRET || process.env.AUTH_JWT_SECRET === DEV_SENTINEL_SECRET)
+) {
+  throw new Error(
+    'AUTH_JWT_SECRET must be set to a real, unique secret when AUTH_PROVIDER=oidc — ' +
+      'every service that verifies a session token must share the exact same value.',
+  );
+}
+
+const secret = new TextEncoder().encode(process.env.AUTH_JWT_SECRET ?? DEV_SENTINEL_SECRET);
 
 // Item 30.2: "kept logged into the device till they logout themselves" — no
 // expiry-driven forced logout, just a long-dated token the client holds onto and

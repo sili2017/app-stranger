@@ -17,7 +17,20 @@ async function bootstrap() {
   app.useGlobalInterceptors(
     new IdempotencyInterceptor(new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379')),
   );
-  app.use(createAuthMiddleware());
+  // Items 30/33 (ultrareview finding): these are the routes a client calls to *obtain*
+  // a session token in the first place — they must stay reachable with no Bearer token
+  // even when this service is opted into AUTH_PROVIDER=oidc, or nobody could ever
+  // register or log in again.
+  app.use(
+    createAuthMiddleware({
+      publicPaths: [
+        '/auth/register/quick',
+        '/auth/register/email',
+        '/auth/login/email',
+        /^\/auth\/oauth\/[^/]+\/login$/,
+      ],
+    }),
+  );
   const port = process.env.PORT ?? 3001;
   await app.listen(port);
   // eslint-disable-next-line no-console

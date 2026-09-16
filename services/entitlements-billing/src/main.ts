@@ -20,7 +20,11 @@ async function bootstrap() {
   app.useGlobalInterceptors(
     new IdempotencyInterceptor(new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379')),
   );
-  app.use(createAuthMiddleware());
+  // ultrareview finding: Stripe authenticates this route with its own `stripe-
+  // signature` header (verified inside the controller against the raw body above),
+  // never a Bearer token — it must stay reachable even under AUTH_PROVIDER=oidc, or
+  // every subscription/payment webhook 401s and billing state stops syncing.
+  app.use(createAuthMiddleware({ publicPaths: ['/payment-webhook/stripe'] }));
   const port = process.env.PORT ?? 3007;
   await app.listen(port);
   // eslint-disable-next-line no-console

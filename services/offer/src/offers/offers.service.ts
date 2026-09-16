@@ -190,7 +190,12 @@ export class OffersService {
     await this.prisma.$transaction(async (tx) => {
       const updated = await tx.meetOffer.update({
         where: { id: offerId },
-        data: { status: 'active', publishedAt, expiresAt },
+        // Item 31/ultrareview finding: a screening_rejected offer is never `active`,
+        // so a creator could hide it (delete()) while an appeal was pending; restoring
+        // it "as if freshly published" must also clear that hide, or it goes active
+        // and starts fanning out to recipients while remaining invisible in the
+        // creator's own My Offers — unmanageable until it silently expires.
+        data: { status: 'active', publishedAt, expiresAt, hiddenAt: null },
       });
       await this.events.offerPublished(
         tx as unknown as PrismaService,

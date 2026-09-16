@@ -46,8 +46,22 @@ function respondUnauthenticated(req: any, res: any): void {
  * Also carries over dev-principal.middleware.ts's `req.correlationId` assignment
  * (used by DomainExceptionFilter and every service's `correlation(req)` helper) —
  * unrelated to auth, but it lived in the same middleware and has no other home.
+ *
+ * `publicPaths` (ultrareview finding): a route a client is *meant* to call with no
+ * credential at all — signup, login, or a third-party webhook (Stripe, say) that
+ * authenticates itself its own way (a signature header) rather than a Bearer token —
+ * must never hit the AUTH_PROVIDER=oidc "no Bearer -> 401" branch below, or it becomes
+ * permanently uncallable the moment a service opts into real auth (the exact case a
+ * new account has no token yet to register/log in *with*). Match on `req.path`
+ * (Express strips the mount prefix already) against exact strings or `RegExp`s; only
+ * skips the "no Bearer" 401 gate, never the Bearer-present verification above it — a
+ * caller presenting a bad token still gets a hard 401 even on a public path.
  */
-export function createAuthMiddleware() {
+export function createAuthMiddleware(options: { publicPaths?: (string | RegExp)[] } = {}) {
+  const publicPaths = options.publicPaths ?? [];
+  const isPublicPath = (path: string) =>
+    publicPaths.some((p) => (typeof p === 'string' ? p === path : p.test(path)));
+
   return async function authMiddleware(req: any, res: any, next: any): Promise<void> {
     req.correlationId = req.headers['x-correlation-id'] ?? 'dev-local';
 
@@ -77,7 +91,7 @@ export function createAuthMiddleware() {
       }
     }
 
-    if (process.env.AUTH_PROVIDER === 'oidc') {
+    if (process.env.AUTH_PROVIDER === 'oidc' && !isPublicPath(req.path)) {
       respondUnauthenticated(req, res);
       return;
     }
