@@ -78,15 +78,55 @@ model UserAccount {
   passwordHash String?
   oauthSubject String?
 
-  publicProfile     PublicProfile?
-  registeredAddress RegisteredAddress?
-  verificationCases VerificationCase[]
-  cityInterests     CityInterest[]
+  /// Item 35: whether the address on file has actually been confirmed reachable — set
+  /// via a one-time link (email) or a one-time code (phone). Resets to false any time
+  /// the value itself changes, since a new address hasn't been proven yet.
+  emailVerified Boolean @default(false)
+  phone         String? @unique
+  phoneVerified Boolean @default(false)
+
+  publicProfile           PublicProfile?
+  registeredAddress       RegisteredAddress?
+  verificationCases       VerificationCase[]
+  cityInterests           CityInterest[]
+  emailVerificationTokens EmailVerificationToken[]
+  phoneVerificationCodes  PhoneVerificationCode[]
 
   // A given provider's subject id maps to exactly one account. Nullable columns don't
   // collide under a Postgres unique index (NULLs are never equal to each other), so
   // this only constrains the email/google/facebook/apple rows that actually set it.
   @@unique([authProvider, oauthSubject])
+}
+
+/// Item 35: a one-time link's hash, sent to the address it's meant to prove control
+/// of. tokenHash (not the raw token) is what's stored — matches passwordHash's own
+/// never-store-the-real-secret rule — since anyone reading this table shouldn't be
+/// able to complete verification on someone else's behalf.
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      UserAccount @relation(fields: [userId], references: [id])
+  email     String
+  tokenHash String   @unique
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([userId])
+}
+
+/// Item 35: a one-time SMS code's hash. `attempts` caps guessing a short numeric code
+/// (unlike the email link's own effectively-unguessable random token).
+model PhoneVerificationCode {
+  id        String   @id @default(uuid())
+  userId    String
+  user      UserAccount @relation(fields: [userId], references: [id])
+  phone     String
+  codeHash  String
+  attempts  Int      @default(0)
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([userId])
 }
 
 enum ProfileVerificationStatus {

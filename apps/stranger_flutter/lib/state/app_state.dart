@@ -104,4 +104,36 @@ class AppState extends ChangeNotifier {
     await session.setHasSeenLocationRationale();
     notifyListeners();
   }
+
+  /// Item 36: everywhere else in the app shows a person by userId (chat senders, an
+  /// offer's expressions of interest) — that's always been meant to be their first
+  /// name, via their public profile; it only ever looked right for a dev sign-in
+  /// because the typed dev name and the userId happened to be the same string. Cached
+  /// per session since the same handful of userIds (chat participants, interested
+  /// recipients) come up repeatedly across screens.
+  final Map<String, String> _displayNameCache = {};
+
+  Future<String> displayName(String userId) async {
+    final cached = _displayNameCache[userId];
+    if (cached != null) return cached;
+    try {
+      final profile = await identity.getProfile(userId);
+      final name = profile.firstName.trim().isNotEmpty ? profile.firstName : userId;
+      _displayNameCache[userId] = name;
+      return name;
+    } catch (_) {
+      return userId;
+    }
+  }
+
+  /// Resolves every id in [userIds] (deduplicated) in parallel and returns a
+  /// userId -> displayName map for exactly those ids — for a screen that shows a list
+  /// of people at once (an EOI list, a chat's messages) rather than one at a time.
+  Future<Map<String, String>> displayNames(Iterable<String> userIds) async {
+    final unique = userIds.toSet();
+    final entries = await Future.wait(
+      unique.map((id) async => MapEntry(id, await displayName(id))),
+    );
+    return Map.fromEntries(entries);
+  }
 }

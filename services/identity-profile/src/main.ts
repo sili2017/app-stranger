@@ -28,6 +28,8 @@ async function bootstrap() {
         '/auth/register/email',
         '/auth/login/email',
         /^\/auth\/oauth\/[^/]+\/login$/,
+        // Item 35: clicked from an email client — never carries this app's session.
+        '/auth/email/verify',
       ],
     }),
   );

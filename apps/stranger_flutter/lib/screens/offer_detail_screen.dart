@@ -38,6 +38,8 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
   bool _alreadyInterested = false;
   String? _shortPlaceName;
   bool _shortPlaceNameFetchStarted = false;
+  // Item 36: recipientUserId -> first name, for the expressions-of-interest list below.
+  Map<String, String> _recipientNames = {};
 
   @override
   void initState() {
@@ -89,6 +91,13 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
           (place['lat'] as num).toDouble(),
           (place['lng'] as num).toDouble(),
         ));
+      }
+      if (eois != null) {
+        final names = await appState.displayNames(
+          eois.map((eoi) => eoi['recipientUserId'] as String),
+        );
+        if (!mounted) return;
+        setState(() => _recipientNames = names);
       }
     } catch (e) {
       if (!mounted) return;
@@ -539,10 +548,11 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
         else
           ..._expressionsOfInterest!.map((eoi) {
             final selected = eoi['selected'] == true;
+            final recipientUserId = eoi['recipientUserId'] as String;
             return Card(
               child: ListTile(
                 leading: const Icon(Icons.person_outline),
-                title: Text(eoi['recipientUserId'] as String),
+                title: Text(_recipientNames[recipientUserId] ?? recipientUserId),
                 subtitle: Text((eoi['message'] as String?) ?? ''),
                 trailing: selected
                     ? IconButton(

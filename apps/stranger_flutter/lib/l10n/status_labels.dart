@@ -31,3 +31,22 @@ String offerStatusEmoji(String status) {
       return '';
   }
 }
+
+/// PublicProfile.verificationStatus comes straight off the wire (`unverified`/
+/// `photo_verified`/`id_verified`) — item 34's localized text for it.
+String verificationStatusLabel(AppLocalizations l10n, String status) {
+  switch (status) {
+    case 'unverified':
+      return l10n.profileVerificationUnverified;
+    case 'photo_verified':
+      return l10n.profileVerificationPhotoVerified;
+    case 'id_verified':
+      return l10n.profileVerificationIdVerified;
+    default:
+      return status;
+  }
+}
+
+/// Item 34: a warning cue until verification is actually done, a trust cue once it is
+/// — never the same neutral icon for both states.
+bool isVerified(String status) => status != 'unverified';

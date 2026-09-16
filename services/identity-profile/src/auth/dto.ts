@@ -1,4 +1,4 @@
-import { IsDateString, IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsDateString, IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 
 /**
  * Item 33: the only real registration path now — name and date of birth, nothing
@@ -46,6 +46,26 @@ export class RegisterEmailDto {
   @IsString()
   @MinLength(1)
   firstName!: string;
+}
+
+/**
+ * Item 35: [phone] must already be combined into E.164 (leading "+", country code
+ * folded in — e.g. "+14155552671") by the caller. Kept as one field rather than a
+ * separate country-code param: E.164 *is* "phone number along with country code," and
+ * every downstream use (SMS delivery, the uniqueness constraint, display) wants the
+ * single canonical form rather than reassembling it from parts every time.
+ */
+export class SetPhoneDto {
+  @Matches(/^\+[1-9]\d{6,14}$/, {
+    message: 'phone must be in E.164 format, e.g. +14155552671',
+  })
+  phone!: string;
+}
+
+export class VerifyPhoneDto {
+  @IsString()
+  @Matches(/^\d{4,8}$/, { message: 'code must be a 4-8 digit number' })
+  code!: string;
 }
 
 export class LoginEmailDto {

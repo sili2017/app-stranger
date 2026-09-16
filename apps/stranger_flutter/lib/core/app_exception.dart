@@ -54,6 +54,18 @@ class AppException implements Exception {
         return l10n.loginProviderNotConfigured;
       case 'INVALID_OAUTH_TOKEN':
         return l10n.errorInvalidOauthToken;
+      case 'NO_EMAIL_SET':
+        return l10n.errorNoEmailSet;
+      case 'NO_PHONE_SET':
+        return l10n.errorNoPhoneSet;
+      case 'PHONE_ALREADY_REGISTERED':
+        return l10n.errorPhoneAlreadyRegistered;
+      case 'CODE_EXPIRED':
+        return l10n.errorCodeExpired;
+      case 'INVALID_CODE':
+        return l10n.errorInvalidCode;
+      case 'TOO_MANY_ATTEMPTS':
+        return l10n.errorTooManyAttempts;
       default:
         return l10n.errorUnknown(messageKey);
     }

@@ -1,6 +1,6 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req, Res } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { DomainError } from '@stranger/ts-platform';
 import { AuthService } from './auth.service';
 import {
@@ -9,6 +9,8 @@ import {
   OAuthLoginDto,
   RegisterEmailDto,
   RegisterQuickDto,
+  SetPhoneDto,
+  VerifyPhoneDto,
 } from './dto';
 
 const OAUTH_PROVIDERS = ['google', 'facebook', 'apple'] as const;
@@ -49,6 +51,52 @@ export class AuthController {
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   async me(@Req() req: Request) {
     return this.auth.me(authenticatedUserId(req));
+  }
+
+  /** Item 35: sets/changes the caller's phone number and sends it a one-time code. */
+  @Post('phone')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async setPhone(@Body() dto: SetPhoneDto, @Req() req: Request) {
+    return this.auth.setPhone(authenticatedUserId(req), dto.phone);
+  }
+
+  @Post('phone/resend')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async resendPhoneCode(@Req() req: Request) {
+    return this.auth.resendPhoneCode(authenticatedUserId(req));
+  }
+
+  @Post('phone/verify')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async verifyPhone(@Body() dto: VerifyPhoneDto, @Req() req: Request) {
+    return this.auth.verifyPhone(authenticatedUserId(req), dto.code);
+  }
+
+  @Post('email/resend')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async resendEmailVerification(@Req() req: Request) {
+    return this.auth.resendEmailVerification(authenticatedUserId(req));
+  }
+
+  /**
+   * Item 35: the link a user taps from their inbox — a plain GET, not a JSON API
+   * call, since it's opened by clicking, and rendered as a small standalone HTML page
+   * rather than the usual error/success envelope everything else in this service
+   * returns (see main.ts's publicPaths — this route works with no Bearer token,
+   * matching that it's clicked from an email client, not the signed-in app).
+   */
+  @Get('email/verify')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async verifyEmail(@Query('token') token: string | undefined, @Res() res: Response) {
+    const ok = token != null && (await this.auth.verifyEmailByToken(token));
+    res
+      .status(ok ? HttpStatus.OK : HttpStatus.BAD_REQUEST)
+      .type('html')
+      .send(
+        ok
+          ? '<!doctype html><title>Email confirmed</title><p>Your email is confirmed — you can close this tab and return to the app.</p>'
+          : '<!doctype html><title>Link expired</title><p>This confirmation link is invalid or has expired. Ask the app to resend it.</p>',
+      );
   }
 
   /** Item 30.1.3: still available as a direct one-step alternative — see dto.ts. */

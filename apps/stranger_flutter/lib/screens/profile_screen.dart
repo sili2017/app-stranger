@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../l10n/gen/app_localizations.dart';
+import '../l10n/status_labels.dart';
 import '../layout/responsive.dart';
 import '../models/profile.dart';
 import '../state/app_state.dart';
@@ -242,7 +243,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       _row(l10n.profileAgeRange, _profile!.ageRangeLabel),
                       _row(l10n.profileVerification,
-                          _profile!.verificationStatus),
+                          verificationStatusLabel(
+                              l10n, _profile!.verificationStatus)),
                       _row(
                         l10n.profileRating,
                         _profile!.publicRatingCount == 0
@@ -284,10 +286,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       .then((_) => _load()),
             ),
             ListTile(
-              leading: const Icon(Icons.verified_user_outlined),
+              leading: _profile == null
+                  ? const Icon(Icons.verified_user_outlined)
+                  : isVerified(_profile!.verificationStatus)
+                      ? Icon(Icons.verified,
+                          color: Theme.of(context).colorScheme.primary)
+                      : Icon(Icons.warning_amber_rounded,
+                          color: Theme.of(context).colorScheme.error),
               title: Text(l10n.profileVerification),
-              subtitle:
-                  _profile == null ? null : Text(_profile!.verificationStatus),
+              subtitle: _profile == null
+                  ? null
+                  : Text(verificationStatusLabel(
+                      l10n, _profile!.verificationStatus)),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context)
                   .push(MaterialPageRoute(

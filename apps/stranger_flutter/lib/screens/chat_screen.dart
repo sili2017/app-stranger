@@ -33,6 +33,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Object? _error;
   Timer? _pollTimer;
   bool _sending = false;
+  // Item 36: senderId -> first name, for the "who sent this" label on each bubble.
+  Map<String, String> _senderNames = {};
 
   @override
   void initState() {
@@ -52,8 +54,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _load({bool silent = false}) async {
     try {
-      final messaging = context.read<AppState>().messaging;
-      final messages = await messaging.listMessages(widget.chatId);
+      final appState = context.read<AppState>();
+      final messages = await appState.messaging.listMessages(widget.chatId);
       if (!mounted) return;
       setState(() {
         _messages = messages;
@@ -62,7 +64,11 @@ class _ChatScreenState extends State<ChatScreen> {
       // Best-effort, fire-and-forget: clears this chat's contribution to the Chats-tab
       // unread badge. Called on every load (not just initState) so a message arriving
       // while the chat is already open is marked read too, not just on first open.
-      unawaited(messaging.markRead(widget.chatId).catchError((_) {}));
+      unawaited(appState.messaging.markRead(widget.chatId).catchError((_) {}));
+      final names =
+          await appState.displayNames(messages.map((m) => m.senderId));
+      if (!mounted) return;
+      setState(() => _senderNames = names);
     } catch (e) {
       if (!mounted) return;
       if (!silent) setState(() => _error = e);
@@ -145,7 +151,9 @@ class _ChatScreenState extends State<ChatScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         if (!isMine)
-                                          Text(m.senderId,
+                                          Text(
+                                              _senderNames[m.senderId] ??
+                                                  m.senderId,
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .labelSmall),

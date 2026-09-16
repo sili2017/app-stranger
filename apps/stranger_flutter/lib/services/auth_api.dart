@@ -20,6 +20,33 @@ class AuthResult {
       );
 }
 
+/// Items 33/35: the signed-in account's credential/verification state — drives
+/// Profile's "secure your account" prompt and VerificationScreen's phone/email
+/// sections.
+class AccountStatus {
+  AccountStatus({
+    required this.hasPassword,
+    required this.email,
+    required this.emailVerified,
+    required this.phone,
+    required this.phoneVerified,
+  });
+
+  final bool hasPassword;
+  final String? email;
+  final bool emailVerified;
+  final String? phone;
+  final bool phoneVerified;
+
+  factory AccountStatus.fromJson(Map<String, dynamic> json) => AccountStatus(
+        hasPassword: json['hasPassword'] as bool,
+        email: json['email'] as String?,
+        emailVerified: json['emailVerified'] as bool,
+        phone: json['phone'] as String?,
+        phoneVerified: json['phoneVerified'] as bool,
+      );
+}
+
 class AuthApi {
   AuthApi(this._client);
   final ApiClient _client;
@@ -45,12 +72,28 @@ class AuthApi {
       _client.post('/auth/complete-profile/email',
           body: {'email': email, 'password': password});
 
+  /// Items 33/35: the signed-in account's current credential/verification state.
+  Future<AccountStatus> me() async {
+    final json = await _client.get('/auth/me');
+    return AccountStatus.fromJson(json as Map<String, dynamic>);
+  }
+
   /// Item 33: whether the signed-in account already has an email/password credential
   /// — drives Profile's "secure your account" prompt.
-  Future<bool> hasPassword() async {
-    final json = await _client.get('/auth/me');
-    return (json as Map<String, dynamic>)['hasPassword'] as bool;
-  }
+  Future<bool> hasPassword() async => (await me()).hasPassword;
+
+  /// Item 35: resends the confirmation link to whatever email is currently on file.
+  Future<void> resendEmailVerification() =>
+      _client.post('/auth/email/resend');
+
+  /// Item 35: [phone] must already be E.164 (leading "+", country code folded in).
+  Future<void> setPhone(String phone) =>
+      _client.post('/auth/phone', body: {'phone': phone});
+
+  Future<void> resendPhoneCode() => _client.post('/auth/phone/resend');
+
+  Future<void> verifyPhone(String code) =>
+      _client.post('/auth/phone/verify', body: {'code': code});
 
   /// Item 30.1.3: still available as a direct alternative — see auth.service.ts.
   Future<AuthResult> registerWithEmail({
