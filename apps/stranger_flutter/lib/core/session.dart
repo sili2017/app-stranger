@@ -1,14 +1,19 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Dev-only stand-in for a real session (ADQ-002a is still open — see
-/// services/api-gateway/src/auth/dev-oidc-issuer.ts). Holds the `x-dev-user-id` every
-/// backend service reads via its `devPrincipalMiddleware`. Persisted to local storage
-/// (web-compatible) purely so a page refresh during manual testing doesn't sign you out.
+/// Item 30.2: "kept logged into the device till they logout themselves" — this is the
+/// one place that persists across app restarts. `userId` is set by either sign-in path:
+/// a real one (`signInWithToken`, see AuthApi) that also stores a bearer session token
+/// ApiClient sends on every request, or the pre-existing dev-only one (`signIn`, see
+/// LoginScreen) with no token at all — every backend service's shared auth middleware
+/// falls back to trusting a bare `x-dev-user-id` header only when no token is present,
+/// so both keep working side by side. Persisted to local storage (web-compatible).
 class Session {
   Session._(this._prefs);
 
   final SharedPreferences _prefs;
   static const _key = 'dev_user_id';
+  static const _tokenKey = 'session_token';
+  static const _authMethodKey = 'auth_method';
   static const _localeKey = 'language_override';
   static const _pushEnabledKey = 'push_enabled';
   static const _locationRationaleSeenKey = 'location_rationale_seen';
@@ -20,9 +25,37 @@ class Session {
 
   String? get userId => _prefs.getString(_key);
 
-  Future<void> signIn(String userId) => _prefs.setString(_key, userId);
+  /// The real bearer session token from email/password or an OAuth login — null for a
+  /// dev-only sign-in (see class doc).
+  String? get token => _prefs.getString(_tokenKey);
 
-  Future<void> signOut() => _prefs.remove(_key);
+  /// 'email' | 'google' | 'facebook' | 'apple' | null (dev-only sign-in, or signed out).
+  String? get authMethod => _prefs.getString(_authMethodKey);
+
+  /// Item 30: a real session from email/password or an OAuth provider.
+  Future<void> signInWithToken(
+    String userId,
+    String token,
+    String authMethod,
+  ) async {
+    await _prefs.setString(_key, userId);
+    await _prefs.setString(_tokenKey, token);
+    await _prefs.setString(_authMethodKey, authMethod);
+  }
+
+  /// Dev-only sign-in (manual/testing) — no token; the backend trusts the bare
+  /// `x-dev-user-id` header verbatim (see createAuthMiddleware's fallback).
+  Future<void> signIn(String userId) async {
+    await _prefs.setString(_key, userId);
+    await _prefs.remove(_tokenKey);
+    await _prefs.remove(_authMethodKey);
+  }
+
+  Future<void> signOut() async {
+    await _prefs.remove(_key);
+    await _prefs.remove(_tokenKey);
+    await _prefs.remove(_authMethodKey);
+  }
 
   /// FR-040: a user override takes priority over the device locale; null means "use the
   /// device locale, falling back to English" (see AppState.resolveLocale).

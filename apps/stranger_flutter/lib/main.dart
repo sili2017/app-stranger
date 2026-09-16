@@ -5,7 +5,7 @@ import 'package:stranger_design_system/stranger_design_system.dart';
 import 'core/session.dart';
 import 'l10n/gen/app_localizations.dart';
 import 'state/app_state.dart';
-import 'screens/login_screen.dart';
+import 'screens/auth_screen.dart';
 import 'screens/home_shell.dart';
 
 Future<void> main() async {
@@ -57,7 +57,7 @@ class StrangerApp extends StatelessWidget {
               return const Locale('en');
             },
             home: session.userId == null
-                ? const LoginScreen()
+                ? const AuthScreen()
                 : const HomeShell(),
           );
         },

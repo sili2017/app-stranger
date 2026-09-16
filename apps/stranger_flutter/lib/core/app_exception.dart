@@ -30,6 +30,8 @@ class AppException implements Exception {
         return l10n.errorEntitlementRequired;
       case 'OFFER_NOT_ACTIVE':
         return l10n.errorOfferNotActive;
+      case 'OFFER_ACTIVE':
+        return l10n.errorOfferActiveCannotDelete;
       case 'CAPACITY_REACHED':
         return l10n.errorCapacityReached;
       case 'NOT_ELIGIBLE':
@@ -40,6 +42,18 @@ class AppException implements Exception {
         return l10n.errorIdempotencyConflict;
       case 'NO_PENDING_ID_CASE':
         return l10n.errorNoPendingIdCase;
+      case 'UNDERAGE_SIGNUP':
+        return l10n.errorUnderageSignup;
+      case 'EMAIL_ALREADY_REGISTERED':
+        return l10n.errorEmailAlreadyRegistered;
+      case 'INVALID_CREDENTIALS':
+        return l10n.errorInvalidCredentials;
+      case 'DATE_OF_BIRTH_REQUIRED':
+        return l10n.errorDateOfBirthRequired;
+      case 'PROVIDER_NOT_CONFIGURED':
+        return l10n.loginProviderNotConfigured;
+      case 'INVALID_OAUTH_TOKEN':
+        return l10n.errorInvalidOauthToken;
       default:
         return l10n.errorUnknown(messageKey);
     }

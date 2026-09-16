@@ -27,6 +27,7 @@ apps/stranger_flutter/.pub/
 apps/stranger_flutter/ios/Pods/
 apps/stranger_flutter/android/.gradle/
 apps/stranger_flutter/lib/l10n/gen/
+apps/stranger_flutter/test/web_e2e/test-results/
 
 # Local dev tooling (Postgres/Redis/Flutter SDK downloaded for local testing — see .tooling/README.md)
 .tooling/

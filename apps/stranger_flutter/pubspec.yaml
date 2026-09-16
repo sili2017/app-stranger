@@ -22,6 +22,10 @@ dependencies:
   provider: ^6.1.2 # lightweight app state (current dev user, entitlements)
   shared_preferences: ^2.2.3 # persist the dev user id across refreshes (web-compatible)
   image_picker: ^1.1.2 # profile/verification photo + government-ID picking; web-compatible via a file input
+  url_launcher: ^6.3.1 # opens WhatsApp/Facebook/Instagram share intents and Google/Apple Maps links
+  google_sign_in: ^6.2.1 # item 30.1.1: Google registration/login
+  flutter_facebook_auth: ^7.1.1 # item 30.1.1: Facebook registration/login
+  sign_in_with_apple: ^6.1.4 # item 30.1.2: Apple registration/login
   stranger_design_system:
     path: ../../packages/dart-design-system
 

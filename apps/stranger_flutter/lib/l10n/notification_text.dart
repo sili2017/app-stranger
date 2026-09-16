@@ -7,7 +7,9 @@ import '../services/notifications_api.dart';
 String notificationText(AppLocalizations l10n, NotificationJob job) {
   switch (job.templateKey) {
     case 'participation.interest-expressed':
-      return l10n.notificationInterestExpressed;
+      final name = job.payload['interestedUserName'] as String?;
+      return l10n.notificationInterestExpressed(
+          (name == null || name.isEmpty) ? l10n.notificationSomeoneFallback : name);
     case 'participation.participant-selected':
       return l10n.notificationParticipantSelected;
     case 'participation.selection-cancelled':

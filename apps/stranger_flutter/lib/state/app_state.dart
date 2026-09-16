@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../config/api_config.dart';
 import '../core/api_client.dart';
 import '../core/session.dart';
+import '../services/auth_api.dart';
 import '../services/identity_api.dart';
 import '../services/offer_api.dart';
 import '../services/discovery_api.dart';
@@ -18,7 +19,8 @@ import '../services/media_api.dart';
 /// `x-dev-user-id`.
 class AppState extends ChangeNotifier {
   AppState(this.session)
-      : identity = IdentityApi(ApiClient(ApiConfig.identityProfile, session)),
+      : auth = AuthApi(ApiClient(ApiConfig.identityProfile, session)),
+        identity = IdentityApi(ApiClient(ApiConfig.identityProfile, session)),
         offer = OfferApi(ApiClient(ApiConfig.offer, session)),
         discovery =
             DiscoveryApi(ApiClient(ApiConfig.discoveryLocation, session)),
@@ -33,6 +35,7 @@ class AppState extends ChangeNotifier {
         media = MediaApi(ApiClient(ApiConfig.media, session));
 
   final Session session;
+  final AuthApi auth;
   final IdentityApi identity;
   final OfferApi offer;
   final DiscoveryApi discovery;
@@ -46,12 +49,35 @@ class AppState extends ChangeNotifier {
   String? get userId => session.userId;
   bool get isSignedIn => userId != null;
 
+  /// Dev-only sign-in (see LoginScreen) — no real credential, no token.
   Future<void> signIn(String userId) async {
     await session.signIn(userId);
     notifyListeners();
   }
 
+  /// Item 30: a real session from email/password or an OAuth provider (see AuthScreen).
+  Future<void> signInWithToken(
+    String userId,
+    String token,
+    String authMethod,
+  ) async {
+    await session.signInWithToken(userId, token, authMethod);
+    notifyListeners();
+  }
+
+  /// Item 30.2: ends the session on this device — the only way out, since a session
+  /// otherwise stays signed in indefinitely.
   Future<void> signOut() async {
+    // Best-effort — a real session's token is discarded client-side regardless of
+    // whether this call succeeds (e.g. offline), and a dev-only session has no server
+    // state to notify at all.
+    if (session.token != null) {
+      try {
+        await auth.logout();
+      } catch (_) {
+        // fine either way — see above
+      }
+    }
     await session.signOut();
     notifyListeners();
   }

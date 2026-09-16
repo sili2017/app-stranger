@@ -66,6 +66,10 @@ class OfferApi {
     return MeetOffer.fromJson(json as Map<String, dynamic>);
   }
 
+  /// Creator-only cleanup of a past offer — the backend rejects this while the offer
+  /// is still active (stop it first).
+  Future<void> delete(String offerId) => _client.delete('/offers/$offerId');
+
   /// Only succeeds for the creator or a recipient with an accepted Selection (FR-002).
   Future<Map<String, dynamic>?> getExactPlace(String offerId) async {
     try {

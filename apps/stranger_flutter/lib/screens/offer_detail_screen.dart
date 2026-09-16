@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/app_exception.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/status_labels.dart';
@@ -33,6 +36,8 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
   final _messageController = TextEditingController();
   bool _busy = false;
   bool _alreadyInterested = false;
+  String? _shortPlaceName;
+  bool _shortPlaceNameFetchStarted = false;
 
   @override
   void initState() {
@@ -76,9 +81,118 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
         _alreadyInterested = alreadyInterested;
         _error = null;
       });
+      if (place != null &&
+          place['label'] == null &&
+          !_shortPlaceNameFetchStarted) {
+        _shortPlaceNameFetchStarted = true;
+        unawaited(_resolveShortPlaceName(
+          (place['lat'] as num).toDouble(),
+          (place['lng'] as num).toDouble(),
+        ));
+      }
     } catch (e) {
       if (!mounted) return;
       if (!silent) setState(() => _error = e);
+    }
+  }
+
+  /// Point 27.2: when the creator didn't type a place label, show a short (2-3 word)
+  /// place name instead of raw coordinates — best-effort reverse geocoding via
+  /// OpenStreetMap's Nominatim, same no-signup provider publish_screen's city
+  /// auto-fill already uses. Never blocks or replaces the exact lat/lng used for the
+  /// Maps deep link, only the label text shown to the user.
+  Future<void> _resolveShortPlaceName(double lat, double lng) async {
+    try {
+      final uri = Uri.parse(
+        'https://nominatim.openstreetmap.org/reverse'
+        '?format=jsonv2&lat=$lat&lon=$lng&zoom=18&addressdetails=1',
+      );
+      final response =
+          await http.get(uri, headers: const {'Accept-Language': 'en'}).timeout(
+        const Duration(seconds: 6),
+      );
+      if (response.statusCode != 200) return;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final address = data['address'] as Map<String, dynamic>?;
+      final candidate = (data['name'] as String?)?.trim().isNotEmpty == true
+          ? data['name'] as String
+          : (address?['road'] ?? address?['suburb'] ?? address?['neighbourhood'])
+              as String?;
+      if (candidate == null || candidate.trim().isEmpty) return;
+      final shortened =
+          candidate.trim().split(RegExp(r'\s+')).take(3).join(' ');
+      if (!mounted) return;
+      setState(() => _shortPlaceName = shortened);
+    } catch (_) {
+      // best-effort; the raw pin still opens Maps correctly either way
+    }
+  }
+
+  Future<void> _openInMaps(double lat, double lng, String? label) async {
+    final l10n = AppLocalizations.of(context)!;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.map_outlined),
+              title: Text(l10n.offerOpenInGoogleMaps),
+              onTap: () => Navigator.of(sheetContext).pop('google'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.map_outlined),
+              title: Text(l10n.offerOpenInAppleMaps),
+              onTap: () => Navigator.of(sheetContext).pop('apple'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    final query = Uri.encodeComponent(label ?? '$lat,$lng');
+    final uri = choice == 'apple'
+        ? Uri.parse('https://maps.apple.com/?ll=$lat,$lng&q=$query')
+        : Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+    final opened =
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      showErrorSnackBar(context, l10n.offerMapsLaunchFailed);
+    }
+  }
+
+  /// Point 27.1: best-effort social share of the just-published offer — never the
+  /// exact place (still gated behind selection per FR-002), only the activity text,
+  /// city, and a link back to the app.
+  Future<void> _shareOnSocial(String platform) async {
+    final l10n = AppLocalizations.of(context)!;
+    final offer = _offer!;
+    final message = l10n.offerShareMessage(
+      offer.activityText,
+      offer.cityId,
+      Uri.base.toString(),
+    );
+    if (platform == 'instagram') {
+      await Clipboard.setData(ClipboardData(text: message));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.offerShareInstagramHint)),
+        );
+      }
+    }
+    final uri = switch (platform) {
+      'whatsapp' => Uri.parse('https://wa.me/?text=${Uri.encodeComponent(message)}'),
+      'facebook' => Uri.parse(
+          'https://www.facebook.com/sharer/sharer.php'
+          '?u=${Uri.encodeComponent(Uri.base.toString())}'
+          '&quote=${Uri.encodeComponent(message)}',
+        ),
+      _ => Uri.parse('https://www.instagram.com/'),
+    };
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      showErrorSnackBar(context, l10n.offerShareLaunchFailed);
     }
   }
 
@@ -116,6 +230,18 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
       if (mounted) await _navigateToChatWhenReady();
     } catch (e) {
       if (mounted) showErrorSnackBar(context, e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Item 29: tapping the green checkmark on an already-selected expression of
+  /// interest opens the shared chat for this offer — same lookup _select() already
+  /// does right after choosing someone, reused here for a selection made earlier.
+  Future<void> _openChatForSelection() async {
+    setState(() => _busy = true);
+    try {
+      await _navigateToChatWhenReady();
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -305,7 +431,9 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
         ),
       );
     }
-    final label = _place!['label'] as String?;
+    final lat = (_place!['lat'] as num).toDouble();
+    final lng = (_place!['lng'] as num).toDouble();
+    final label = _place!['label'] as String? ?? _shortPlaceName;
     final rendezvous = _place!['rendezvousInstruction'] as String?;
     return Card(
       child: Padding(
@@ -315,11 +443,14 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.place_outlined),
-                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.place_outlined),
+                  tooltip: l10n.offerOpenInMaps,
+                  onPressed: () => _openInMaps(lat, lng, label),
+                ),
                 Expanded(
                   child: Text(
-                    label ?? '${_place!['lat']}, ${_place!['lng']}',
+                    label ?? l10n.offerLocationPinned,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
@@ -344,11 +475,47 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
     );
   }
 
+  Widget _shareOfferSection(BuildContext context, AppLocalizations l10n) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.offerShareOfferTitle,
+              style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _shareOnSocial('whatsapp'),
+                icon: const Icon(Icons.chat_bubble_outline),
+                label: Text(l10n.offerShareWhatsapp),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _shareOnSocial('facebook'),
+                icon: const Icon(Icons.facebook_outlined),
+                label: Text(l10n.offerShareFacebook),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _shareOnSocial('instagram'),
+                icon: const Icon(Icons.camera_alt_outlined),
+                label: Text(l10n.offerShareInstagram),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _creatorControls(BuildContext context, AppLocalizations l10n) {
     final offer = _offer!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (offer.isActive) _shareOfferSection(context, l10n),
         if (offer.isActive)
           OutlinedButton.icon(
             onPressed: _busy ? null : _stop,
@@ -378,7 +545,12 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
                 title: Text(eoi['recipientUserId'] as String),
                 subtitle: Text((eoi['message'] as String?) ?? ''),
                 trailing: selected
-                    ? Chip(label: Text(l10n.offerSelected))
+                    ? IconButton(
+                        icon: const Icon(Icons.check_circle,
+                            color: Colors.green),
+                        tooltip: l10n.offerSelected,
+                        onPressed: _busy ? null : _openChatForSelection,
+                      )
                     : FilledButton(
                         onPressed: (_busy || !offer.isActive)
                             ? null

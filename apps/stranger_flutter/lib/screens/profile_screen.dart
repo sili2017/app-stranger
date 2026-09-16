@@ -7,10 +7,10 @@ import '../models/profile.dart';
 import '../state/app_state.dart';
 import '../widgets/async_state_views.dart';
 import '../widgets/profile_avatar.dart';
+import 'auth_screen.dart';
 import 'city_interests_screen.dart';
 import 'edit_profile_screen.dart';
 import 'entitlements_screen.dart';
-import 'login_screen.dart';
 import 'safety_screen.dart';
 import 'verification_screen.dart';
 
@@ -80,7 +80,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await context.read<AppState>().signOut();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(builder: (_) => const AuthScreen()),
       (route) => false,
     );
   }
@@ -127,6 +127,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final userId = context.watch<AppState>().userId ?? '';
+    // A dev-only sign-in's userId is whatever plain name was typed, so it was always
+    // a fine display name by coincidence — a real account's userId is a UUID, so the
+    // profile's own firstName (once loaded) is what should actually show here.
+    final displayName =
+        (_profile?.firstName.isNotEmpty ?? false) ? _profile!.firstName : userId;
     final languageOverride = context.watch<AppState>().languageOverride;
     return Scaffold(
       appBar: AppBar(title: Text(l10n.profileTitle)),
@@ -140,7 +145,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   ProfileAvatar(
                     photoAssetId: _profile?.photoAssetId,
-                    fallbackText: userId.isEmpty ? '?' : userId[0].toUpperCase(),
+                    fallbackText:
+                        displayName.isEmpty ? '?' : displayName[0].toUpperCase(),
                   ),
                   Positioned(
                     right: -4,
@@ -176,7 +182,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Text(userId,
+            Text(displayName,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),

@@ -422,14 +422,7 @@ class _PublishScreenState extends State<PublishScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.my_location),
-                      label: Text(
-                        _lat == null
-                            ? l10n.publishUseCurrentLocation
-                            : l10n.publishLocationSet(
-                                _lat!.toStringAsFixed(4),
-                                _lng!.toStringAsFixed(4),
-                              ),
-                      ),
+                      label: Text(l10n.publishUseCurrentLocation),
                     ),
                   ),
                 ],

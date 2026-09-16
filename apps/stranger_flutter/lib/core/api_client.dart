@@ -17,8 +17,16 @@ class ApiClient {
 
   Map<String, String> _headers({String? idempotencyKey}) {
     final headers = {'Content-Type': 'application/json'};
-    final userId = session.userId;
-    if (userId != null) headers['x-dev-user-id'] = userId;
+    // Item 30: a real session token always wins — the backend verifies it
+    // cryptographically instead of trusting a bare header. Only a dev-only sign-in
+    // (no token) falls back to x-dev-user-id.
+    final token = session.token;
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
+    } else {
+      final userId = session.userId;
+      if (userId != null) headers['x-dev-user-id'] = userId;
+    }
     if (idempotencyKey != null) headers['Idempotency-Key'] = idempotencyKey;
     return headers;
   }

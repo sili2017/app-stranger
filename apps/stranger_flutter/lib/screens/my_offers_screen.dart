@@ -22,6 +22,7 @@ class MyOffersScreen extends StatefulWidget {
 class _MyOffersScreenState extends State<MyOffersScreen> {
   List<MeetOffer>? _offers;
   Object? _error;
+  String? _deletingId;
 
   @override
   void initState() {
@@ -38,6 +39,43 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e);
+    }
+  }
+
+  /// Item 28: a creator may declutter their history once an offer is no longer
+  /// active — the backend itself rejects deleting a still-active one (stop it first).
+  Future<void> _confirmDelete(MeetOffer offer) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.myOffersDeleteConfirmTitle),
+        content: Text(l10n.myOffersDeleteConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l10n.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(l10n.myOffersDeleteConfirmAction),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deletingId = offer.id);
+    try {
+      await context.read<AppState>().offer.delete(offer.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.myOffersDeleted)));
+      await _load();
+    } catch (e) {
+      if (mounted) showErrorSnackBar(context, e);
+    } finally {
+      if (mounted) setState(() => _deletingId = null);
     }
   }
 
@@ -76,7 +114,36 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
                                         o.interestCount,
                                       ),
                                     ),
-                                    trailing: Text(o.cityId),
+                                    trailing: o.isActive
+                                        ? Text(o.cityId)
+                                        : Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(o.cityId),
+                                              _deletingId == o.id
+                                                  ? const Padding(
+                                                      padding:
+                                                          EdgeInsets.all(8),
+                                                      child: SizedBox(
+                                                        width: 20,
+                                                        height: 20,
+                                                        child:
+                                                            CircularProgressIndicator(
+                                                                strokeWidth:
+                                                                    2),
+                                                      ),
+                                                    )
+                                                  : IconButton(
+                                                      icon: const Icon(
+                                                          Icons
+                                                              .delete_outline),
+                                                      tooltip: l10n
+                                                          .myOffersDelete,
+                                                      onPressed: () =>
+                                                          _confirmDelete(o),
+                                                    ),
+                                            ],
+                                          ),
                                     // Detail lets you stop/rebroadcast/select — a plain `push`
                                     // with no refresh-on-return left this list showing "active"
                                     // for an offer just stopped seconds earlier, since this

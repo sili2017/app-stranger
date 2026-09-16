@@ -7,6 +7,7 @@ import '../layout/responsive.dart';
 import '../services/notifications_api.dart';
 import '../state/app_state.dart';
 import '../widgets/async_state_views.dart';
+import 'offer_detail_screen.dart';
 
 /// FR-006/T108: the in-app live feed — the universal fallback every signed-in user gets
 /// regardless of push permission, so nothing is ever silently missed.
@@ -67,6 +68,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  /// Item 27: a creator tapping "X expressed interest in your offer" should land
+  /// directly on that offer's expressions-of-interest list rather than having to hunt
+  /// for it in My Offers — OfferDetailScreen already shows that list inline for the
+  /// creator (see _creatorControls).
+  void _onNotificationTap(NotificationJob job) {
+    if (job.templateKey != 'participation.interest-expressed') return;
+    final offerId = job.payload['offerId'] as String?;
+    if (offerId == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => OfferDetailScreen(offerId: offerId)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -102,6 +116,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       leading: const Icon(Icons.notifications_outlined),
                       title: Text(notificationText(l10n, n)),
                       subtitle: Text(_relativeTime(l10n, n.createdAt)),
+                      onTap: () => _onNotificationTap(n),
                     ),
                   ),
                 ),
