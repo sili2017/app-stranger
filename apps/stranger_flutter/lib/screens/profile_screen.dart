@@ -9,6 +9,7 @@ import '../widgets/async_state_views.dart';
 import '../widgets/profile_avatar.dart';
 import 'auth_screen.dart';
 import 'city_interests_screen.dart';
+import 'complete_profile_screen.dart';
 import 'edit_profile_screen.dart';
 import 'entitlements_screen.dart';
 import 'safety_screen.dart';
@@ -28,6 +29,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   PublicProfile? _profile;
   Object? _error;
   bool _uploadingPhoto = false;
+  // Item 33: null while unknown/loading, so the "secure your account" banner never
+  // flashes on then off — it only ever appears once we're sure it's warranted.
+  bool? _hasPassword;
 
   @override
   void initState() {
@@ -46,6 +50,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
       setState(() => _error = e);
     }
+    // Best-effort, separate from the main profile load: a fresh/never-seeded dev
+    // sign-in has no UserAccount row at all and would 404 here, which shouldn't take
+    // down the rest of the screen.
+    try {
+      final hasPassword = await appState.auth.hasPassword();
+      if (!mounted) return;
+      setState(() => _hasPassword = hasPassword);
+    } catch (_) {
+      // leave the banner hidden rather than guess
+    }
+  }
+
+  Future<void> _completeProfile() async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const CompleteProfileScreen()),
+    );
+    if (saved == true) await _load();
   }
 
   /// Feature 25: reuses verification_screen.dart's exact pick-upload-attach pattern —
@@ -186,6 +207,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
+            if (_hasPassword == false) ...[
+              Card(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Icon(Icons.shield_outlined,
+                          color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(l10n.profileSecureAccountBanner)),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: _completeProfile,
+                        child: Text(l10n.profileSecureAccountAction),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             if (_error != null)
               ErrorView(error: _error!, onRetry: _load)
             else if (_profile == null)

@@ -14,10 +14,14 @@ import '../widgets/async_state_views.dart';
 import 'home_shell.dart';
 import 'login_screen.dart';
 
-/// Item 30: the real registration/login screen — email/password (30.1.3), Google/
-/// Facebook (30.1.1), and Apple (30.1.2). Replaces LoginScreen as the app's signed-out
-/// entry point; LoginScreen is still reachable from here for manual/dev testing (it
-/// backs the seed-test-data.js named users, which have no email/password).
+/// Items 30/33: the real registration/login screen. Registration (item 33) collects
+/// only a name and date of birth — the fastest possible path to actually using the
+/// app — via Google/Facebook/Apple (one tap) or the "Create account" form; email and
+/// password are a deferred, optional "secure your account" step from Profile (see
+/// CompleteProfileScreen), not a signup requirement. The "Log in" tab still takes
+/// email+password, for returning to an account that has since completed that step.
+/// LoginScreen is still reachable from here for manual/dev testing (it backs the
+/// seed-test-data.js named users, which have no email/password).
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
@@ -28,7 +32,9 @@ class AuthScreen extends StatefulWidget {
 enum _AuthMode { login, register }
 
 class _AuthScreenState extends State<AuthScreen> {
-  _AuthMode _mode = _AuthMode.login;
+  // Item 33: default to the fast path — most first-time visitors here want to sign
+  // up, not log in.
+  _AuthMode _mode = _AuthMode.register;
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _firstNameController = TextEditingController();
@@ -92,7 +98,7 @@ class _AuthScreenState extends State<AuthScreen> {
         .pushReplacement(MaterialPageRoute(builder: (_) => const HomeShell()));
   }
 
-  Future<void> _submitEmail() async {
+  Future<void> _submitLogin() async {
     final l10n = AppLocalizations.of(context)!;
     final email = _emailController.text.trim();
     final password = _passwordController.text;
@@ -101,8 +107,25 @@ class _AuthScreenState extends State<AuthScreen> {
           .showSnackBar(SnackBar(content: Text(l10n.loginMissingFields)));
       return;
     }
-    if (_mode == _AuthMode.register &&
-        (_firstNameController.text.trim().isEmpty || _dateOfBirth == null)) {
+
+    setState(() => _submitting = true);
+    final appState = context.read<AppState>();
+    try {
+      final result =
+          await appState.auth.loginWithEmail(email: email, password: password);
+      await appState.signInWithToken(result.userId, result.token, 'email');
+      _goHome();
+    } catch (e) {
+      if (mounted) showErrorSnackBar(context, e);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  /// Item 33: name + date of birth only — see the class doc for why.
+  Future<void> _submitRegister() async {
+    final l10n = AppLocalizations.of(context)!;
+    if (_firstNameController.text.trim().isEmpty || _dateOfBirth == null) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(l10n.loginMissingFields)));
       return;
@@ -111,15 +134,11 @@ class _AuthScreenState extends State<AuthScreen> {
     setState(() => _submitting = true);
     final appState = context.read<AppState>();
     try {
-      final result = _mode == _AuthMode.login
-          ? await appState.auth.loginWithEmail(email: email, password: password)
-          : await appState.auth.registerWithEmail(
-              email: email,
-              password: password,
-              dateOfBirth: _isoDate(_dateOfBirth!),
-              firstName: _firstNameController.text.trim(),
-            );
-      await appState.signInWithToken(result.userId, result.token, 'email');
+      final result = await appState.auth.registerQuick(
+        firstName: _firstNameController.text.trim(),
+        dateOfBirth: _isoDate(_dateOfBirth!),
+      );
+      await appState.signInWithToken(result.userId, result.token, 'quick');
       _goHome();
     } catch (e) {
       if (mounted) showErrorSnackBar(context, e);
@@ -332,6 +351,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                       const SizedBox(height: 16),
                       if (isRegister) ...[
+                        // Item 33: just name + date of birth — no email/password at
+                        // signup, that's a later, optional step from Profile.
                         TextField(
                           controller: _firstNameController,
                           decoration: InputDecoration(
@@ -339,28 +360,6 @@ class _AuthScreenState extends State<AuthScreen> {
                             border: const OutlineInputBorder(),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                      ],
-                      TextField(
-                        controller: _emailController,
-                        decoration: InputDecoration(
-                          labelText: l10n.loginEmailLabel,
-                          border: const OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _passwordController,
-                        decoration: InputDecoration(
-                          labelText: l10n.loginPasswordLabel,
-                          border: const OutlineInputBorder(),
-                        ),
-                        obscureText: true,
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _submitEmail(),
-                      ),
-                      if (isRegister) ...[
                         const SizedBox(height: 12),
                         OutlinedButton.icon(
                           onPressed: () async {
@@ -374,10 +373,32 @@ class _AuthScreenState extends State<AuthScreen> {
                                 : l10n.loginDobLabel(_isoDate(_dateOfBirth!)),
                           ),
                         ),
+                      ] else ...[
+                        TextField(
+                          controller: _emailController,
+                          decoration: InputDecoration(
+                            labelText: l10n.loginEmailLabel,
+                            border: const OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _passwordController,
+                          decoration: InputDecoration(
+                            labelText: l10n.loginPasswordLabel,
+                            border: const OutlineInputBorder(),
+                          ),
+                          obscureText: true,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => _submitLogin(),
+                        ),
                       ],
                       const SizedBox(height: 16),
                       FilledButton(
-                        onPressed: _submitting ? null : _submitEmail,
+                        onPressed: _submitting
+                            ? null
+                            : (isRegister ? _submitRegister : _submitLogin),
                         child: _submitting
                             ? const SizedBox(
                                 width: 20,

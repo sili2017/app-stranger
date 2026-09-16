@@ -42,10 +42,17 @@ enum AccountStatus {
   disabled
 }
 
-/// Item 30: how this account was registered. `dev` is the pre-existing x-dev-user-id
-/// stand-in (seed scripts, manual testing) — every real account is one of the other four.
+/// Item 30/33: how this account was registered. `dev` is the pre-existing
+/// x-dev-user-id stand-in (seed scripts, manual testing). `quick` is item 33's
+/// name+date-of-birth-only signup — no email/password yet, just a device session;
+/// `email`/`google`/`facebook`/`apple` all still apply once/if the account later adds
+/// real credentials (see UserAccount.email/passwordHash — a `quick` account keeps
+/// authProvider `quick` even after completing its profile with an email+password,
+/// since that column records *how the account started*, not just its current
+/// strongest credential; loginWithEmail only ever checks email+passwordHash directly).
 enum AuthProviderKind {
   dev
+  quick
   email
   google
   facebook

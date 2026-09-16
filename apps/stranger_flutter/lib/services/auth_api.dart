@@ -24,7 +24,35 @@ class AuthApi {
   AuthApi(this._client);
   final ApiClient _client;
 
-  /// Item 30.1.3.
+  /// Item 33: the primary signup path — name and date of birth only, so a new user is
+  /// in the app and able to connect with people as fast as possible. Email/password is
+  /// deferred to [completeProfileEmail].
+  Future<AuthResult> registerQuick({
+    required String firstName,
+    required String dateOfBirth,
+  }) async {
+    final json = await _client.post('/auth/register/quick',
+        body: {'firstName': firstName, 'dateOfBirth': dateOfBirth});
+    return AuthResult.fromJson(json as Map<String, dynamic>);
+  }
+
+  /// Item 33: the deferred "profile completion" step — adds a real, recoverable
+  /// email+password credential to the signed-in caller's own account.
+  Future<void> completeProfileEmail({
+    required String email,
+    required String password,
+  }) =>
+      _client.post('/auth/complete-profile/email',
+          body: {'email': email, 'password': password});
+
+  /// Item 33: whether the signed-in account already has an email/password credential
+  /// — drives Profile's "secure your account" prompt.
+  Future<bool> hasPassword() async {
+    final json = await _client.get('/auth/me');
+    return (json as Map<String, dynamic>)['hasPassword'] as bool;
+  }
+
+  /// Item 30.1.3: still available as a direct alternative — see auth.service.ts.
   Future<AuthResult> registerWithEmail({
     required String email,
     required String password,

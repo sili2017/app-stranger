@@ -43,6 +43,11 @@
   "loginAuthDisclaimer": "Stranger का उपयोग करने के लिए आपकी आयु 18+ होनी चाहिए।",
   "loginDevSignInLink": "डेवलपर साइन-इन (परीक्षण)",
 
+  "completeProfileTitle": "अपना खाता सुरक्षित करें",
+  "completeProfileBody": "एक ईमेल और पासवर्ड जोड़ें ताकि आप किसी भी डिवाइस से वापस लॉग इन कर सकें, भले ही आप यह डिवाइस खो दें।",
+  "completeProfileSave": "सहेजें",
+  "completeProfileSaved": "आपका खाता अब सुरक्षित है।",
+
   "feedTitle": "खोजें",
   "feedFilterActivity": "गतिविधि से फ़िल्टर करें",
   "feedDistanceLabel": "दूरी",
@@ -202,6 +207,8 @@
   "profileSafety": "सुरक्षा",
   "profileLanguage": "भाषा",
   "profileLanguageSystemDefault": "सिस्टम डिफ़ॉल्ट",
+  "profileSecureAccountBanner": "एक ईमेल और पासवर्ड जोड़ें ताकि आप किसी भी डिवाइस से अपने खाते में वापस आ सकें।",
+  "profileSecureAccountAction": "खाता सुरक्षित करें",
 
   "safetyTitle": "सुरक्षा",
   "safetyGuidanceHeading": "मिलने से पहले",

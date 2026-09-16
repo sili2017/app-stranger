@@ -43,6 +43,11 @@
   "loginAuthDisclaimer": "You must be 18+ to use Stranger.",
   "loginDevSignInLink": "Developer sign-in (testing)",
 
+  "completeProfileTitle": "Secure your account",
+  "completeProfileBody": "Add an email and password so you can log back in from any device, even if you lose this one.",
+  "completeProfileSave": "Save",
+  "completeProfileSaved": "Your account is now secured.",
+
   "feedTitle": "Discover",
   "feedFilterActivity": "Filter by activity",
   "feedDistanceLabel": "Distance",
@@ -202,6 +207,8 @@
   "profileSafety": "Safety",
   "profileLanguage": "Language",
   "profileLanguageSystemDefault": "System default",
+  "profileSecureAccountBanner": "Add an email and password so you can get back into your account from any device.",
+  "profileSecureAccountAction": "Secure account",
 
   "safetyTitle": "Safety",
   "safetyGuidanceHeading": "Before you meet",

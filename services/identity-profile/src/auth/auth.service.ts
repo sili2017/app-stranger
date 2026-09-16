@@ -40,6 +40,55 @@ function isAtLeastMinAge(dob: Date): boolean {
 export class AuthService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Item 33: the primary registration path — name and date of birth only, so a new
+   * user is in the app and able to connect with people immediately. Issues a real
+   * session token right away, same as every other path; the account just has no
+   * email/password (or OAuth link) yet, so it's only reachable from this device until
+   * completeProfileEmail runs.
+   */
+  async registerQuick(firstName: string, dateOfBirth: string) {
+    const dob = new Date(dateOfBirth);
+    if (!isAtLeastMinAge(dob)) {
+      throw new DomainError('UNDERAGE_SIGNUP', 'errors.underageSignup', HttpStatus.FORBIDDEN);
+    }
+    const account = await this.provisionAccount({
+      authProvider: 'quick',
+      dateOfBirth: dob,
+      firstName,
+    });
+    return this.issueSession(account.id);
+  }
+
+  /**
+   * Item 33: adds a real, recoverable email+password credential to the signed-in
+   * caller's own account — the deferred "profile completion" step. Works whether the
+   * account currently has none (a quick-registered account's first credential) or
+   * already has one (changing it); either way this is a set, not a create.
+   */
+  async completeProfileEmail(userId: string, email: string, password: string) {
+    const existing = await this.prisma.userAccount.findUnique({ where: { email } });
+    if (existing && existing.id !== userId) {
+      throw new DomainError(
+        'EMAIL_ALREADY_REGISTERED',
+        'errors.emailAlreadyRegistered',
+        HttpStatus.CONFLICT,
+      );
+    }
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    await this.prisma.userAccount.update({
+      where: { id: userId },
+      data: { email, passwordHash },
+    });
+    return { email };
+  }
+
+  /** Item 33: lets the client know whether to prompt "secure your account" (Profile). */
+  async me(userId: string) {
+    const account = await this.prisma.userAccount.findUniqueOrThrow({ where: { id: userId } });
+    return { hasPassword: account.passwordHash != null };
+  }
+
   async registerWithEmail(email: string, password: string, dateOfBirth: string, firstName: string) {
     const dob = new Date(dateOfBirth);
     if (!isAtLeastMinAge(dob)) {
@@ -124,7 +173,7 @@ export class AuthService {
   }
 
   private async provisionAccount(input: {
-    authProvider: 'email' | OAuthProvider;
+    authProvider: 'quick' | 'email' | OAuthProvider;
     dateOfBirth: Date;
     firstName: string;
     email?: string;
