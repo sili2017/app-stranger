@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomInt, randomUUID } from 'crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { DomainError, signSessionToken } from '@stranger/ts-platform';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../generated/prisma-client';
 import { PrismaService } from '../prisma.service';
 import { ageRangeLabelFor } from '../verification/verification.service';
 import {
