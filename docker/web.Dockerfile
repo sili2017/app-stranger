@@ -7,8 +7,13 @@
 # ships with (see each service's main.ts comment: "MUST NOT be carried into
 # production"). It also means only port 80/443 needs to be reachable from outside
 # the Docker network; the 9 domain services stay internal-only.
+#
+# Flutter version is pinned explicitly (not `:stable`) — that floating tag lagged
+# behind an SDK release this pubspec needs (flutter_localizations' intl pin was
+# still 0.20.2 there, but pubspec.yaml requires intl ^0.20.3), confirmed via a
+# failed build in .github/workflows/deploy.yml. Bump deliberately, not by drifting.
 
-FROM ghcr.io/cirruslabs/flutter:stable AS build
+FROM ghcr.io/cirruslabs/flutter:3.44.0 AS build
 # pubspec.yaml's stranger_design_system dependency is `path:
 # ../../packages/dart-design-system`, resolved relative to this app's own directory
 # — the real repo layout has to be preserved under the build context (not flattened
