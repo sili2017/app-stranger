@@ -8,12 +8,22 @@
 # production"). It also means only port 80/443 needs to be reachable from outside
 # the Docker network; the 9 domain services stay internal-only.
 #
-# Flutter version is pinned explicitly (not `:stable`) — that floating tag lagged
-# behind an SDK release this pubspec needs (flutter_localizations' intl pin was
-# still 0.20.2 there, but pubspec.yaml requires intl ^0.20.3), confirmed via a
-# failed build in .github/workflows/deploy.yml. Bump deliberately, not by drifting.
-
-FROM ghcr.io/cirruslabs/flutter:3.44.0 AS build
+# Flutter is installed by cloning the `stable` branch directly from the official
+# flutter/flutter repo — the same source .github/workflows/ci.yml's
+# subosito/flutter-action uses (`channel: stable`) — rather than a third-party
+# prebuilt image. ghcr.io/cirruslabs/flutter's tags (including its floating
+# `:stable` and even its newest numbered tag at the time this was written) lagged
+# behind the actual upstream stable channel: their bundled flutter_localizations
+# still pinned intl to 0.20.2, but pubspec.yaml requires intl ^0.20.3 — confirmed
+# via repeated failed builds in .github/workflows/deploy.yml. Cloning from the same
+# source CI verifies against avoids this class of drift entirely.
+FROM debian:bookworm-slim AS build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      git curl ca-certificates unzip xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+RUN git clone --depth 1 -b stable https://github.com/flutter/flutter.git /flutter
+ENV PATH="/flutter/bin:${PATH}"
+RUN flutter precache --web && flutter doctor -v
 # pubspec.yaml's stranger_design_system dependency is `path:
 # ../../packages/dart-design-system`, resolved relative to this app's own directory
 # — the real repo layout has to be preserved under the build context (not flattened
