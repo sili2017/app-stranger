@@ -37,7 +37,10 @@ describe('OffersService.restoreFromScreeningAppeal (T135, FR-039)', () => {
     const prisma = new FakePrismaService();
     const events = new OfferEventsProducer();
     const internal = {
-      authorizeEntitlement: async () => ({ decision: 'granted' as const, entitlementSource: 'free_allowance' }),
+      authorizeEntitlement: async () => ({
+        decision: 'granted' as const,
+        entitlementSource: 'free_allowance',
+      }),
     };
     const service = new OffersService(prisma as any, events, internal as any);
     await buildRejectedOffer(prisma);

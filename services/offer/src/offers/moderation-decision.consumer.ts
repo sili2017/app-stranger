@@ -24,8 +24,9 @@ export class ModerationDecisionConsumer implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.offerEventBus.bus.subscribe<Record<string, unknown>>('trust.moderation-decisioned', (e) =>
-      this.guarded(e, () => this.onModerationDecisioned(e)),
+    await this.offerEventBus.bus.subscribe<Record<string, unknown>>(
+      'trust.moderation-decisioned',
+      (e) => this.guarded(e, () => this.onModerationDecisioned(e)),
     );
   }
 

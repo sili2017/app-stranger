@@ -178,11 +178,7 @@ export class ModerationService {
       throw new DomainError('UNAUTHORIZED', 'errors.unauthorized', HttpStatus.FORBIDDEN);
     }
     if (offer.status !== 'screening_rejected') {
-      throw new DomainError(
-        'NOT_APPEALABLE',
-        'errors.notAppealable',
-        HttpStatus.CONFLICT,
-      );
+      throw new DomainError('NOT_APPEALABLE', 'errors.notAppealable', HttpStatus.CONFLICT);
     }
 
     return this.prisma.screeningAppeal.upsert({

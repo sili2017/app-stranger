@@ -26,7 +26,7 @@ describe('Unread message count (Feature 24)', () => {
     expect(await controller.getUnreadCount(req('user-1'))).toEqual({ unreadCount: 0 });
   });
 
-  it('counts only messages from other senders, never the caller\'s own', async () => {
+  it("counts only messages from other senders, never the caller's own", async () => {
     const { controller, prisma } = buildController();
     await prisma.chatMembership.create({ data: { chatId: 'chat-1', userId: 'user-1' } });
     await prisma.message.create({ data: { chatId: 'chat-1', senderId: 'user-2', body: 'hi' } });

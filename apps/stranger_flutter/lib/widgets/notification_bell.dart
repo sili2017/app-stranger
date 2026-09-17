@@ -62,7 +62,8 @@ class _NotificationBellState extends State<NotificationBell> {
         ),
         tooltip: l10n.notificationsTooltip,
         onPressed: () => Navigator.of(context)
-            .push(MaterialPageRoute(builder: (_) => const NotificationsScreen()))
+            .push(
+                MaterialPageRoute(builder: (_) => const NotificationsScreen()))
             .then((_) => _load()),
       ),
     );

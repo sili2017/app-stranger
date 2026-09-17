@@ -157,10 +157,13 @@ class _AuthScreenState extends State<AuthScreen> {
     final appState = context.read<AppState>();
     try {
       final identity = await _obtainProviderToken(provider);
-      if (identity == null) return; // not configured, or the user cancelled the picker
+      if (identity == null) {
+        return; // not configured, or the user cancelled the picker
+      }
       final (token, firstName) = identity;
 
-      Future<AuthResult> attempt({String? dateOfBirth}) => appState.auth.loginWithOAuth(
+      Future<AuthResult> attempt({String? dateOfBirth}) =>
+          appState.auth.loginWithOAuth(
             provider: provider,
             token: token,
             dateOfBirth: dateOfBirth,
@@ -183,8 +186,8 @@ class _AuthScreenState extends State<AuthScreen> {
     } on AppException catch (e) {
       if (!mounted) return;
       if (e.code == 'PROVIDER_NOT_CONFIGURED') {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(l10n.loginProviderNotConfigured)));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.loginProviderNotConfigured)));
       } else {
         showErrorSnackBar(context, e);
       }
@@ -203,8 +206,8 @@ class _AuthScreenState extends State<AuthScreen> {
     switch (provider) {
       case 'google':
         if (AuthProviderConfig.googleWebClientId.isEmpty) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(l10n.loginProviderNotConfigured)));
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.loginProviderNotConfigured)));
           return null;
         }
         final googleSignIn =
@@ -218,8 +221,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
       case 'facebook':
         if (AuthProviderConfig.facebookAppId.isEmpty) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(l10n.loginProviderNotConfigured)));
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.loginProviderNotConfigured)));
           return null;
         }
         await FacebookAuth.instance.webAndDesktopInitialize(
@@ -238,8 +241,8 @@ class _AuthScreenState extends State<AuthScreen> {
       case 'apple':
         if (AuthProviderConfig.appleServiceId.isEmpty ||
             AuthProviderConfig.appleRedirectUri.isEmpty) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(l10n.loginProviderNotConfigured)));
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.loginProviderNotConfigured)));
           return null;
         }
         final credential = await SignInWithApple.getAppleIDCredential(
@@ -341,8 +344,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         children: [
                           const Expanded(child: Divider()),
                           Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
                             child: Text(l10n.loginOrDivider,
                                 style: Theme.of(context).textTheme.bodySmall),
                           ),
@@ -445,7 +447,9 @@ class _AuthScreenState extends State<AuthScreen> {
       onPressed: _busyProvider == null ? () => _handleOAuth(provider) : null,
       icon: busy
           ? const SizedBox(
-              width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2))
           : Icon(icon),
       label: Text(label),
     );

@@ -68,7 +68,9 @@ export class RatingService {
     // or the 5-day SLA (RatingVisibilitySlaScheduler) — either way, still gated on its
     // own photo-consent requirement, which the mutual/SLA rule never bypasses.
     const counterpart = await this.prisma.ratingFeedback.findUnique({
-      where: { selectionId_raterUserId: { selectionId: dto.selectionId, raterUserId: rateeUserId } },
+      where: {
+        selectionId_raterUserId: { selectionId: dto.selectionId, raterUserId: rateeUserId },
+      },
     });
     const visibility = consentSatisfied && counterpart ? 'public' : 'pending_followup';
 
@@ -154,7 +156,12 @@ export class RatingService {
     // a counterpart rating to publish immediately; absent one, RatingVisibilitySlaScheduler
     // picks it up once the 5-day SLA elapses (it only re-checks consent, already done here).
     const counterpart = await this.prisma.ratingFeedback.findUnique({
-      where: { selectionId_raterUserId: { selectionId: rating.selectionId, raterUserId: rating.rateeUserId } },
+      where: {
+        selectionId_raterUserId: {
+          selectionId: rating.selectionId,
+          raterUserId: rating.rateeUserId,
+        },
+      },
     });
     const shouldPublish = allConsented && !!counterpart;
 

@@ -141,9 +141,9 @@ describe('ProfilesService.updateProfile — a real gap found via manual testing:
   it('throws NOT_FOUND rather than silently creating a profile for an unprovisioned user', async () => {
     const prisma = new FakePrismaService();
     const service = new ProfilesService(prisma as any);
-    await expect(
-      service.updateProfile('nobody', { firstName: 'X' }),
-    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(service.updateProfile('nobody', { firstName: 'X' })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
   });
 });
 
@@ -158,7 +158,12 @@ describe('VerificationService.submitPhotoVerification — another gap found via 
     const prisma = new FakePrismaService();
     await prisma.publicProfile.upsert({
       where: { userId: 'user-6' },
-      create: { userId: 'user-6', firstName: '', ageRangeLabel: '25-30', verificationStatus: 'unverified' },
+      create: {
+        userId: 'user-6',
+        firstName: '',
+        ageRangeLabel: '25-30',
+        verificationStatus: 'unverified',
+      },
     });
     const service = buildVerificationService(prisma);
 

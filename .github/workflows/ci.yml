@@ -23,6 +23,21 @@ jobs:
     needs: detect-changes
     if: contains(needs.detect-changes.outputs.services, 'ts')
     runs-on: ubuntu-latest
+    # packages/ts-platform's idempotency.spec.ts talks to a real Redis (it exercises
+    # the actual IdempotencyInterceptor against ioredis, not a mock) — every
+    # workspace's `npm test` runs here via `npm run test --workspaces`, so this
+    # needs to be up for that one spec even though this job otherwise never touches
+    # Redis.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,6 +49,8 @@ jobs:
       - run: npm run format
       - run: npm run build
       - run: npm test
+        env:
+          REDIS_URL: redis://localhost:6379
 
   flutter-analyze-format-test:
     needs: detect-changes

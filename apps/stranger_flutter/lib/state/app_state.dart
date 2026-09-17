@@ -118,7 +118,8 @@ class AppState extends ChangeNotifier {
     if (cached != null) return cached;
     try {
       final profile = await identity.getProfile(userId);
-      final name = profile.firstName.trim().isNotEmpty ? profile.firstName : userId;
+      final name =
+          profile.firstName.trim().isNotEmpty ? profile.firstName : userId;
       _displayNameCache[userId] = name;
       return name;
     } catch (_) {

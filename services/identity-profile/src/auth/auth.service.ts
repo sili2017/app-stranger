@@ -159,7 +159,11 @@ export class AuthService {
   async setPhone(userId: string, phone: string) {
     const existing = await this.prisma.userAccount.findUnique({ where: { phone } });
     if (existing && existing.id !== userId) {
-      throw new DomainError('PHONE_ALREADY_REGISTERED', 'errors.phoneAlreadyRegistered', HttpStatus.CONFLICT);
+      throw new DomainError(
+        'PHONE_ALREADY_REGISTERED',
+        'errors.phoneAlreadyRegistered',
+        HttpStatus.CONFLICT,
+      );
     }
     await this.prisma.userAccount.update({
       where: { id: userId },
@@ -195,7 +199,11 @@ export class AuthService {
       throw new DomainError('CODE_EXPIRED', 'errors.codeExpired', HttpStatus.BAD_REQUEST);
     }
     if (pending.attempts >= PHONE_CODE_MAX_ATTEMPTS) {
-      throw new DomainError('TOO_MANY_ATTEMPTS', 'errors.tooManyAttempts', HttpStatus.TOO_MANY_REQUESTS);
+      throw new DomainError(
+        'TOO_MANY_ATTEMPTS',
+        'errors.tooManyAttempts',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
     const matches = await bcrypt.compare(code, pending.codeHash);
     if (!matches) {
@@ -241,7 +249,10 @@ export class AuthService {
         expiresAt: new Date(Date.now() + PHONE_CODE_TTL_MS),
       },
     });
-    await this.smsSender.send(phone, `Your Stranger verification code is ${code}. It expires in 10 minutes.`);
+    await this.smsSender.send(
+      phone,
+      `Your Stranger verification code is ${code}. It expires in 10 minutes.`,
+    );
   }
 
   async registerWithEmail(email: string, password: string, dateOfBirth: string, firstName: string) {
@@ -272,7 +283,11 @@ export class AuthService {
   async loginWithEmail(email: string, password: string) {
     const account = await this.prisma.userAccount.findUnique({ where: { email } });
     if (!account?.passwordHash || !(await bcrypt.compare(password, account.passwordHash))) {
-      throw new DomainError('INVALID_CREDENTIALS', 'errors.invalidCredentials', HttpStatus.UNAUTHORIZED);
+      throw new DomainError(
+        'INVALID_CREDENTIALS',
+        'errors.invalidCredentials',
+        HttpStatus.UNAUTHORIZED,
+      );
     }
     return this.issueSession(account.id);
   }
@@ -286,7 +301,9 @@ export class AuthService {
     const identity = await this.verifyProviderToken(provider, token);
 
     const existing = await this.prisma.userAccount.findUnique({
-      where: { authProvider_oauthSubject: { authProvider: provider, oauthSubject: identity.subject } },
+      where: {
+        authProvider_oauthSubject: { authProvider: provider, oauthSubject: identity.subject },
+      },
     });
     if (existing) {
       return this.issueSession(existing.id);

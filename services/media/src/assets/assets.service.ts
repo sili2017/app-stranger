@@ -17,7 +17,11 @@ export class AssetsService {
     try {
       contents = Buffer.from(dto.base64Data, 'base64');
     } catch {
-      throw new DomainError('INVALID_ASSET_DATA', 'errors.invalidAssetData', HttpStatus.BAD_REQUEST);
+      throw new DomainError(
+        'INVALID_ASSET_DATA',
+        'errors.invalidAssetData',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     if (contents.length === 0 || contents.length > MAX_BYTES) {
       throw new DomainError('ASSET_TOO_LARGE', 'errors.assetTooLarge', HttpStatus.BAD_REQUEST, [
@@ -26,7 +30,12 @@ export class AssetsService {
     }
 
     const asset = await this.prisma.asset.create({
-      data: { ownerUserId, contentType: dto.contentType, byteSize: contents.length, storageKey: '' },
+      data: {
+        ownerUserId,
+        contentType: dto.contentType,
+        byteSize: contents.length,
+        storageKey: '',
+      },
     });
     const storageKey = `${ownerUserId}/${asset.id}-${dto.filename}`;
     await this.storage.put(storageKey, contents, dto.contentType);

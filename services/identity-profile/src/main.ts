@@ -2,7 +2,11 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import Redis from 'ioredis';
-import { DomainExceptionFilter, IdempotencyInterceptor, createAuthMiddleware } from '@stranger/ts-platform';
+import {
+  DomainExceptionFilter,
+  IdempotencyInterceptor,
+  createAuthMiddleware,
+} from '@stranger/ts-platform';
 import { AppModule } from './app.module';
 
 async function bootstrap() {

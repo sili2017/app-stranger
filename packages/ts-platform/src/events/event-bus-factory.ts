@@ -21,9 +21,7 @@ import { KafkaEventBus } from './kafka-event-bus';
 export function createEventBus(redisUrl: string, serviceName: string): EventBus {
   const driver = process.env.EVENT_BUS_DRIVER ?? 'redis';
   if (driver === 'kafka') {
-    const brokers = (process.env.KAFKA_BROKERS ?? 'localhost:9092')
-      .split(',')
-      .map((b) => b.trim());
+    const brokers = (process.env.KAFKA_BROKERS ?? 'localhost:9092').split(',').map((b) => b.trim());
     return new KafkaEventBus(brokers, serviceName);
   }
   return new RedisEventBus(redisUrl);

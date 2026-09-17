@@ -26,5 +26,7 @@ export function createStorageAdapter(): StorageAdapter {
     const client = new S3Client({ region });
     return new S3StorageAdapter(bucket, client);
   }
-  return new LocalFilesystemStorageAdapter(process.env.MEDIA_STORAGE_DIR ?? '.tooling/media-storage');
+  return new LocalFilesystemStorageAdapter(
+    process.env.MEDIA_STORAGE_DIR ?? '.tooling/media-storage',
+  );
 }

@@ -15,9 +15,7 @@ export class InternalClients {
   }
 
   /** Convergence T128: verifies caller/status before accepting a screening appeal. */
-  async getOfferStatus(
-    offerId: string,
-  ): Promise<{ status: string; creatorUserId: string } | null> {
+  async getOfferStatus(offerId: string): Promise<{ status: string; creatorUserId: string } | null> {
     const body = (await this.getWithTimeout(
       `${this.offerBaseUrl}/internal/v1/offers/${offerId}/status`,
     )) as { status?: string; creatorUserId?: string };

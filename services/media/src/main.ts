@@ -3,7 +3,11 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import Redis from 'ioredis';
-import { DomainExceptionFilter, IdempotencyInterceptor, createAuthMiddleware } from '@stranger/ts-platform';
+import {
+  DomainExceptionFilter,
+  IdempotencyInterceptor,
+  createAuthMiddleware,
+} from '@stranger/ts-platform';
 import { AppModule } from './app.module';
 
 async function bootstrap() {

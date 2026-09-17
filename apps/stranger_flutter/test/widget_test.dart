@@ -9,14 +9,16 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('shows the dev sign-in screen when no session exists', (
+  testWidgets('shows the registration/login screen when no session exists', (
     WidgetTester tester,
   ) async {
     final session = await Session.load();
     await tester.pumpWidget(StrangerApp(session: session));
 
     expect(find.text('Stranger'), findsOneWidget);
-    expect(find.text('Continue'), findsOneWidget);
+    // AuthScreen defaults to the register tab — "Create account" labels both the
+    // tab segment and the submit button, so it appears twice.
+    expect(find.text('Create account'), findsNWidgets(2));
   });
 
   testWidgets('goes straight to the home shell when a session already exists', (

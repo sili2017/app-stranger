@@ -22,7 +22,11 @@ describe('OidcVerifier', () => {
   }
 
   async function signToken(overrides: Record<string, unknown> = {}, expiresIn = '1h') {
-    return new jose.SignJWT({ ageAssuranceStatus: 'liveness_passed', roles: ['member'], ...overrides })
+    return new jose.SignJWT({
+      ageAssuranceStatus: 'liveness_passed',
+      roles: ['member'],
+      ...overrides,
+    })
       .setProtectedHeader({ alg: 'RS256', kid })
       .setSubject('user-123')
       .setIssuer(ISSUER)

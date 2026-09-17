@@ -4,7 +4,10 @@ import { PrismaOutboxRepository } from './prisma-outbox-repository';
 
 @Injectable()
 export class OutboxRelayService implements OnModuleInit, OnModuleDestroy {
-  private readonly eventBus = createEventBus(process.env.REDIS_URL ?? 'redis://localhost:6379', 'trust-safety');
+  private readonly eventBus = createEventBus(
+    process.env.REDIS_URL ?? 'redis://localhost:6379',
+    'trust-safety',
+  );
   private relay: OutboxRelay | null = null;
 
   constructor(private readonly repository: PrismaOutboxRepository) {}

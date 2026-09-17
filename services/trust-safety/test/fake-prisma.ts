@@ -35,7 +35,11 @@ export class FakePrismaService {
   };
 
   auditLogEntry = {
-    create: async ({ data }: any) => ({ id: `audit-${this.nextId++}`, createdAt: new Date(), ...data }),
+    create: async ({ data }: any) => ({
+      id: `audit-${this.nextId++}`,
+      createdAt: new Date(),
+      ...data,
+    }),
   };
 
   screeningAppeal = {
@@ -43,7 +47,13 @@ export class FakePrismaService {
       const key = `${where.offerId_creatorUserId.offerId}:${where.offerId_creatorUserId.creatorUserId}`;
       const existing = this.screeningAppeals.get(key);
       if (existing) return existing;
-      const row = { id: `appeal-${this.nextId++}`, status: 'submitted', createdAt: new Date(), decidedAt: null, ...create };
+      const row = {
+        id: `appeal-${this.nextId++}`,
+        status: 'submitted',
+        createdAt: new Date(),
+        decidedAt: null,
+        ...create,
+      };
       this.screeningAppeals.set(key, row);
       return row;
     },
@@ -129,7 +139,9 @@ export class FakePrismaService {
     },
     findMany: async ({ where }: any) =>
       [...this.ratings.values()].filter(
-        (r) => r.visibility === where.visibility && r.createdAt.getTime() <= where.createdAt.lte.getTime(),
+        (r) =>
+          r.visibility === where.visibility &&
+          r.createdAt.getTime() <= where.createdAt.lte.getTime(),
       ),
   };
 

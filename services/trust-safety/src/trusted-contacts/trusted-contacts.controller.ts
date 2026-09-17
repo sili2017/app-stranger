@@ -71,11 +71,7 @@ export class TrustedContactsController {
     const userId = principal(req);
     const setting = await this.prisma.trustedContactSetting.findUnique({ where: { userId } });
     if (!setting) {
-      throw new DomainError(
-        'NO_TRUSTED_CONTACT',
-        'errors.noTrustedContact',
-        HttpStatus.CONFLICT,
-      );
+      throw new DomainError('NO_TRUSTED_CONTACT', 'errors.noTrustedContact', HttpStatus.CONFLICT);
     }
 
     const place = await this.internal.getExactPlace(dto.offerId, userId);

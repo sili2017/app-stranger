@@ -56,9 +56,8 @@ class StrangerApp extends StatelessWidget {
               }
               return const Locale('en');
             },
-            home: session.userId == null
-                ? const AuthScreen()
-                : const HomeShell(),
+            home:
+                session.userId == null ? const AuthScreen() : const HomeShell(),
           );
         },
       ),

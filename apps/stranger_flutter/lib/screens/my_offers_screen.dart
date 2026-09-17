@@ -129,16 +129,14 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
                                                         height: 20,
                                                         child:
                                                             CircularProgressIndicator(
-                                                                strokeWidth:
-                                                                    2),
+                                                                strokeWidth: 2),
                                                       ),
                                                     )
                                                   : IconButton(
                                                       icon: const Icon(
-                                                          Icons
-                                                              .delete_outline),
-                                                      tooltip: l10n
-                                                          .myOffersDelete,
+                                                          Icons.delete_outline),
+                                                      tooltip:
+                                                          l10n.myOffersDelete,
                                                       onPressed: () =>
                                                           _confirmDelete(o),
                                                     ),

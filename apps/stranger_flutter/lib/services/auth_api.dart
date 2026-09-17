@@ -83,8 +83,7 @@ class AuthApi {
   Future<bool> hasPassword() async => (await me()).hasPassword;
 
   /// Item 35: resends the confirmation link to whatever email is currently on file.
-  Future<void> resendEmailVerification() =>
-      _client.post('/auth/email/resend');
+  Future<void> resendEmailVerification() => _client.post('/auth/email/resend');
 
   /// Item 35: [phone] must already be E.164 (leading "+", country code folded in).
   Future<void> setPhone(String phone) =>

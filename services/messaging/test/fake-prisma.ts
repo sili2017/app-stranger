@@ -68,9 +68,8 @@ export class FakePrismaService {
     findUnique: async ({ where }: any) => {
       const { chatId, userId } = where.chatId_userId;
       return (
-        [...this.memberships.values()].find(
-          (m) => m.chatId === chatId && m.userId === userId,
-        ) ?? null
+        [...this.memberships.values()].find((m) => m.chatId === chatId && m.userId === userId) ??
+        null
       );
     },
     findMany: async ({ where }: any) =>

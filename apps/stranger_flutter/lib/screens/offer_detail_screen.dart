@@ -125,8 +125,9 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
       final address = data['address'] as Map<String, dynamic>?;
       final candidate = (data['name'] as String?)?.trim().isNotEmpty == true
           ? data['name'] as String
-          : (address?['road'] ?? address?['suburb'] ?? address?['neighbourhood'])
-              as String?;
+          : (address?['road'] ??
+              address?['suburb'] ??
+              address?['neighbourhood']) as String?;
       if (candidate == null || candidate.trim().isEmpty) return;
       final shortened =
           candidate.trim().split(RegExp(r'\s+')).take(3).join(' ');
@@ -163,9 +164,9 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
     final query = Uri.encodeComponent(label ?? '$lat,$lng');
     final uri = choice == 'apple'
         ? Uri.parse('https://maps.apple.com/?ll=$lat,$lng&q=$query')
-        : Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
-    final opened =
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        : Uri.parse(
+            'https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!opened && mounted) {
       showErrorSnackBar(context, l10n.offerMapsLaunchFailed);
     }
@@ -191,7 +192,8 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
       }
     }
     final uri = switch (platform) {
-      'whatsapp' => Uri.parse('https://wa.me/?text=${Uri.encodeComponent(message)}'),
+      'whatsapp' =>
+        Uri.parse('https://wa.me/?text=${Uri.encodeComponent(message)}'),
       'facebook' => Uri.parse(
           'https://www.facebook.com/sharer/sharer.php'
           '?u=${Uri.encodeComponent(Uri.base.toString())}'
@@ -292,7 +294,8 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
     }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.offerChatNotReadyYet)),
+        SnackBar(
+            content: Text(AppLocalizations.of(context)!.offerChatNotReadyYet)),
       );
     }
   }
@@ -316,8 +319,10 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
     final l10n = AppLocalizations.of(context)!;
     setState(() => _busy = true);
     try {
-      final share =
-          await context.read<AppState>().trustSafety.shareMeetup(widget.offerId);
+      final share = await context
+          .read<AppState>()
+          .trustSafety
+          .shareMeetup(widget.offerId);
       await Clipboard.setData(ClipboardData(text: share.message));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -552,12 +557,13 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
             return Card(
               child: ListTile(
                 leading: const Icon(Icons.person_outline),
-                title: Text(_recipientNames[recipientUserId] ?? recipientUserId),
+                title:
+                    Text(_recipientNames[recipientUserId] ?? recipientUserId),
                 subtitle: Text((eoi['message'] as String?) ?? ''),
                 trailing: selected
                     ? IconButton(
-                        icon: const Icon(Icons.check_circle,
-                            color: Colors.green),
+                        icon:
+                            const Icon(Icons.check_circle, color: Colors.green),
                         tooltip: l10n.offerSelected,
                         onPressed: _busy ? null : _openChatForSelection,
                       )
@@ -593,9 +599,8 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
         const SizedBox(height: 12),
         FilledButton.icon(
           onPressed: (_busy || _alreadyInterested) ? null : _expressInterest,
-          icon: Icon(_alreadyInterested
-              ? Icons.favorite
-              : Icons.waving_hand_outlined),
+          icon: Icon(
+              _alreadyInterested ? Icons.favorite : Icons.waving_hand_outlined),
           label: Text(_alreadyInterested
               ? l10n.offerInterestSentLabel
               : l10n.offerImInterested),

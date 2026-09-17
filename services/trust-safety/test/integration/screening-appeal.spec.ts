@@ -45,18 +45,35 @@ describe('Screening appeal (T128, FR-039)', () => {
   it('accepts a valid appeal and is idempotent on retry', async () => {
     const { service } = buildService({ status: 'screening_rejected', creatorUserId: 'creator-1' });
 
-    const first = await service.submitScreeningAppeal('creator-1', 'offer-1', 'this was a false positive');
-    const retry = await service.submitScreeningAppeal('creator-1', 'offer-1', 'this was a false positive');
+    const first = await service.submitScreeningAppeal(
+      'creator-1',
+      'offer-1',
+      'this was a false positive',
+    );
+    const retry = await service.submitScreeningAppeal(
+      'creator-1',
+      'offer-1',
+      'this was a false positive',
+    );
 
     expect(first.status).toBe('submitted');
     expect(retry.id).toBe(first.id);
   });
 
   it('marks the appeal upheld when the moderator overturns the screening decision', async () => {
-    const { service, prisma } = buildService({ status: 'screening_rejected', creatorUserId: 'creator-1' });
+    const { service, prisma } = buildService({
+      status: 'screening_rejected',
+      creatorUserId: 'creator-1',
+    });
     const appeal = await service.submitScreeningAppeal('creator-1', 'offer-1', undefined);
 
-    await service.overrideScreening('moderator-1', 'offer-1', 'rejected', 'false positive', 'corr-1');
+    await service.overrideScreening(
+      'moderator-1',
+      'offer-1',
+      'rejected',
+      'false positive',
+      'corr-1',
+    );
 
     const updated = await prisma.screeningAppeal.findMany({ where: { offerId: 'offer-1' } });
     expect(updated).toHaveLength(1);
@@ -65,10 +82,19 @@ describe('Screening appeal (T128, FR-039)', () => {
   });
 
   it('marks the appeal denied when the moderator enforces (upholds) the screening decision', async () => {
-    const { service, prisma } = buildService({ status: 'screening_rejected', creatorUserId: 'creator-1' });
+    const { service, prisma } = buildService({
+      status: 'screening_rejected',
+      creatorUserId: 'creator-1',
+    });
     await service.submitScreeningAppeal('creator-1', 'offer-1', undefined);
 
-    await service.overrideScreening('moderator-1', 'offer-1', 'enforced', 'still a violation', 'corr-1');
+    await service.overrideScreening(
+      'moderator-1',
+      'offer-1',
+      'enforced',
+      'still a violation',
+      'corr-1',
+    );
 
     const updated = await prisma.screeningAppeal.findMany({ where: { offerId: 'offer-1' } });
     expect(updated[0].status).toBe('denied');

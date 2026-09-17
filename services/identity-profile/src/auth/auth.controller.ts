@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { DomainError } from '@stranger/ts-platform';
@@ -118,7 +129,12 @@ export class AuthController {
     if (!OAUTH_PROVIDERS.includes(provider as OAuthProvider)) {
       throw new DomainError('UNKNOWN_PROVIDER', 'errors.unknownProvider', HttpStatus.BAD_REQUEST);
     }
-    return this.auth.loginWithOAuth(provider as OAuthProvider, dto.token, dto.dateOfBirth, dto.firstName);
+    return this.auth.loginWithOAuth(
+      provider as OAuthProvider,
+      dto.token,
+      dto.dateOfBirth,
+      dto.firstName,
+    );
   }
 
   /**

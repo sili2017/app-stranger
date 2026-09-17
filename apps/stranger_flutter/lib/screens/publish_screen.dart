@@ -468,7 +468,8 @@ class _PublishScreenState extends State<PublishScreen> {
                   max: 30,
                   divisions: 25,
                   label: '$_lifetimeMinutes',
-                  onChanged: (v) => setState(() => _lifetimeMinutes = v.round()),
+                  onChanged: (v) =>
+                      setState(() => _lifetimeMinutes = v.round()),
                 ),
               ),
               const SizedBox(height: 8),

@@ -76,8 +76,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Profile... immediately reflects on the public profile"), so no new backend
   /// endpoint is needed to persist the picture itself.
   Future<void> _pickAndUploadPhoto() async {
-    final picked =
-        await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85);
+    final picked = await ImagePicker()
+        .pickImage(source: ImageSource.gallery, imageQuality: 85);
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
     if (!mounted) return;
@@ -152,8 +152,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // A dev-only sign-in's userId is whatever plain name was typed, so it was always
     // a fine display name by coincidence — a real account's userId is a UUID, so the
     // profile's own firstName (once loaded) is what should actually show here.
-    final displayName =
-        (_profile?.firstName.isNotEmpty ?? false) ? _profile!.firstName : userId;
+    final displayName = (_profile?.firstName.isNotEmpty ?? false)
+        ? _profile!.firstName
+        : userId;
     final languageOverride = context.watch<AppState>().languageOverride;
     return Scaffold(
       appBar: AppBar(title: Text(l10n.profileTitle)),
@@ -167,8 +168,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   ProfileAvatar(
                     photoAssetId: _profile?.photoAssetId,
-                    fallbackText:
-                        displayName.isEmpty ? '?' : displayName[0].toUpperCase(),
+                    fallbackText: displayName.isEmpty
+                        ? '?'
+                        : displayName[0].toUpperCase(),
                   ),
                   Positioned(
                     right: -4,
@@ -194,7 +196,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               : Icon(
                                   Icons.camera_alt_outlined,
                                   size: 16,
-                                  color: Theme.of(context).colorScheme.onPrimary,
+                                  color:
+                                      Theme.of(context).colorScheme.onPrimary,
                                 ),
                         ),
                       ),
@@ -242,7 +245,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _row(l10n.profileAgeRange, _profile!.ageRangeLabel),
-                      _row(l10n.profileVerification,
+                      _row(
+                          l10n.profileVerification,
                           verificationStatusLabel(
                               l10n, _profile!.verificationStatus)),
                       _row(

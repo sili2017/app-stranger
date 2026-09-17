@@ -19,9 +19,9 @@ export class InternalClients {
   /** Display name for a notification body — best-effort, falls back to null on any failure. */
   async getUserFirstName(userId: string): Promise<string | null> {
     try {
-      const body = (await this.getWithTimeout(
-        `${this.identityBaseUrl}/profiles/${userId}`,
-      )) as { firstName?: string };
+      const body = (await this.getWithTimeout(`${this.identityBaseUrl}/profiles/${userId}`)) as {
+        firstName?: string;
+      };
       return body?.firstName ?? null;
     } catch {
       return null;

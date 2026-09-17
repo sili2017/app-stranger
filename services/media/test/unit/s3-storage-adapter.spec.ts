@@ -1,4 +1,9 @@
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3StorageAdapter } from '../../src/storage/s3-storage.adapter';
 
@@ -44,7 +49,9 @@ describe('S3StorageAdapter', () => {
     const url = await adapter.getSignedUrl('users/1/photo.jpg', 300);
 
     expect(GetObjectCommand).toHaveBeenCalledWith({ Bucket: bucket, Key: 'users/1/photo.jpg' });
-    expect(getSignedUrl).toHaveBeenCalledWith(client, expect.any(GetObjectCommand), { expiresIn: 300 });
+    expect(getSignedUrl).toHaveBeenCalledWith(client, expect.any(GetObjectCommand), {
+      expiresIn: 300,
+    });
     expect(url).toBe('https://signed.example.com/photo.jpg');
   });
 

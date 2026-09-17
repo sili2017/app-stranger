@@ -156,8 +156,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
       await context.read<AppState>().auth.verifyPhone(code);
       if (!mounted) return;
       _phoneCodeController.clear();
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l10n.verificationPhoneVerified)));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.verificationPhoneVerified)));
       await _load();
     } catch (e) {
       if (mounted) showErrorSnackBar(context, e);
@@ -172,8 +172,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
     try {
       await context.read<AppState>().auth.resendEmailVerification();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.verificationEmailResent)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.verificationEmailResent)));
     } catch (e) {
       if (mounted) showErrorSnackBar(context, e);
     } finally {

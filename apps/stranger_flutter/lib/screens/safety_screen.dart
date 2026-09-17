@@ -40,7 +40,8 @@ class _SafetyScreenState extends State<SafetyScreen> {
       _error = null;
     });
     try {
-      final contact = await context.read<AppState>().trustSafety.getTrustedContact();
+      final contact =
+          await context.read<AppState>().trustSafety.getTrustedContact();
       if (!mounted) return;
       setState(() {
         _contactController.text = contact?.contactHandle ?? '';
@@ -96,7 +97,8 @@ class _SafetyScreenState extends State<SafetyScreen> {
         const SizedBox(height: 12),
         _guidanceTile(Icons.place_outlined, l10n.safetyGuidanceConfirmPlace),
         _guidanceTile(Icons.people_outline, l10n.safetyGuidanceTellSomeone),
-        _guidanceTile(Icons.psychology_outlined, l10n.safetyGuidanceTrustInstincts),
+        _guidanceTile(
+            Icons.psychology_outlined, l10n.safetyGuidanceTrustInstincts),
         _guidanceTile(Icons.emergency_outlined, l10n.safetyGuidanceEmergency),
         const SizedBox(height: 24),
         Text(l10n.safetyTrustedContactHeading,

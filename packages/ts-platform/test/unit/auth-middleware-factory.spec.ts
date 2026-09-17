@@ -57,6 +57,7 @@ describe('createAuthMiddleware', () => {
 
   it('AUTH_PROVIDER=oidc with missing Authorization header: responds 401 and never calls next()', async () => {
     process.env.AUTH_PROVIDER = 'oidc';
+    process.env.AUTH_JWT_SECRET = 'test-only-jwt-secret';
     const { createAuthMiddleware } = require('../../src/auth/auth-middleware-factory');
     const middleware = createAuthMiddleware();
     const { req, res } = fakeReqRes({});
@@ -71,6 +72,7 @@ describe('createAuthMiddleware', () => {
 
   it('AUTH_PROVIDER=oidc with malformed (non-Bearer) Authorization header: responds 401 and never calls next()', async () => {
     process.env.AUTH_PROVIDER = 'oidc';
+    process.env.AUTH_JWT_SECRET = 'test-only-jwt-secret';
     const { createAuthMiddleware } = require('../../src/auth/auth-middleware-factory');
     const middleware = createAuthMiddleware();
     const { req, res } = fakeReqRes({ authorization: 'Basic not-a-bearer-token' });
@@ -85,6 +87,7 @@ describe('createAuthMiddleware', () => {
 
   it('AUTH_PROVIDER=oidc with a well-formed header but a verifier that rejects: responds 401', async () => {
     process.env.AUTH_PROVIDER = 'oidc';
+    process.env.AUTH_JWT_SECRET = 'test-only-jwt-secret';
     process.env.OIDC_ISSUER_URL = 'https://issuer.example.test/';
     jest.doMock('../../src/auth/oidc-verifier', () => ({
       OidcVerifier: jest.fn().mockImplementation(() => ({
@@ -104,6 +107,7 @@ describe('createAuthMiddleware', () => {
 
   it('AUTH_PROVIDER=oidc with a well-formed header and a verifier that succeeds: sets verifiedPrincipal and calls next()', async () => {
     process.env.AUTH_PROVIDER = 'oidc';
+    process.env.AUTH_JWT_SECRET = 'test-only-jwt-secret';
     process.env.OIDC_ISSUER_URL = 'https://issuer.example.test/';
     const principal = { userId: 'u-1', ageAssuranceStatus: 'liveness_passed', roles: ['member'] };
     jest.doMock('../../src/auth/oidc-verifier', () => ({

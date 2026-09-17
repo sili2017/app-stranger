@@ -27,7 +27,10 @@ export class OidcVerifier {
   private readonly jwksUri: string;
   private readonly jwks: jose.JWTVerifyGetKey;
 
-  constructor(private readonly issuerUrl: string, options: OidcVerifierOptions = {}) {
+  constructor(
+    private readonly issuerUrl: string,
+    options: OidcVerifierOptions = {},
+  ) {
     this.audience = options.audience;
     this.jwksUri = options.jwksUri ?? `${issuerUrl.replace(/\/$/, '')}/.well-known/jwks.json`;
     this.jwks = options.jwks ?? jose.createRemoteJWKSet(new URL(this.jwksUri));
