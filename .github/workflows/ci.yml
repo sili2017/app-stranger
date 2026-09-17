@@ -45,6 +45,18 @@ jobs:
           node-version: "18.17.0"
           cache: "npm"
       - run: npm ci
+      # Each of the 9 domain services uses Prisma with a custom client output path
+      # (services/<name>/generated/prisma-client) that's gitignored and only ever
+      # produced by this command — docker/backend.Dockerfile already does the same
+      # thing before its own build. Without it, `npm run build`'s tsc invocation
+      # can't see any Prisma model types (PrismaService fields like
+      # `discoveryEligibility` don't exist until this runs).
+      - name: Generate Prisma clients
+        run: |
+          for s in identity-profile offer discovery-location participation messaging \
+                   trust-safety entitlements-billing notification media; do
+            npx prisma generate --schema=services/$s/prisma/schema.prisma
+          done
       - run: npm run lint
       - run: npm run format
       - run: npm run build
