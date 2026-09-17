@@ -12,6 +12,7 @@ coverage/
 .env.*
 !.env.example
 !.env.prod.example
+!.env.cloud.example
 
 # Prisma
 **/prisma/migrations/dev.db

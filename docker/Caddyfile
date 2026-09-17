@@ -1,0 +1,46 @@
+# Cloud deployment edge: serves the Flutter Web build and reverse-proxies
+# /api/<service>/* to the internal backend containers, mirroring docker/nginx.conf's
+# routing exactly (same single-origin, no-CORS design — see that file's comment).
+# The one thing nginx doesn't do without extra certbot machinery: Caddy issues and
+# renews a real Let's Encrypt certificate for {$SITE_ADDRESS} automatically, since
+# that's a real resolvable hostname (a sslip.io name built from the server's static
+# IP), not "localhost" or a bare IP literal.
+
+{$SITE_ADDRESS} {
+	encode gzip
+
+	handle_path /api/identity-profile/* {
+		reverse_proxy identity-profile:3001
+	}
+	handle_path /api/offer/* {
+		reverse_proxy offer:3002
+	}
+	handle_path /api/discovery-location/* {
+		reverse_proxy discovery-location:3003
+	}
+	handle_path /api/participation/* {
+		reverse_proxy participation:3004
+	}
+	handle_path /api/messaging/* {
+		reverse_proxy messaging:3005
+	}
+	handle_path /api/trust-safety/* {
+		reverse_proxy trust-safety:3006
+	}
+	handle_path /api/entitlements-billing/* {
+		reverse_proxy entitlements-billing:3007
+	}
+	handle_path /api/notification/* {
+		reverse_proxy notification:3008
+	}
+	handle_path /api/media/* {
+		reverse_proxy media:3009
+	}
+
+	# Flutter Web (compiled release build), same as nginx.conf's `root`/`try_files`.
+	handle {
+		root * /usr/share/caddy
+		try_files {path} /index.html
+		file_server
+	}
+}

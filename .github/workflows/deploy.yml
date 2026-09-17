@@ -1,0 +1,129 @@
+name: Deploy
+
+# Runs only after the existing CI workflow finishes successfully on main (never in
+# parallel with it, and never on a red build) — see .github/workflows/ci.yml.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  build-and-push:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # docker/backend.Dockerfile already bakes every one of the 9 domain services +
+      # api-gateway into one image and switches entrypoint on SERVICE_NAME (see that
+      # file's own comment) — build it once here; docker-compose.cloud.yml sets
+      # SERVICE_NAME per container at runtime, not at build time, so no --build-arg
+      # is needed.
+      - name: Build & push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/backend.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/app-stranger-backend:latest
+            ghcr.io/${{ github.repository_owner }}/app-stranger-backend:${{ github.event.workflow_run.head_sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push web (Caddy) image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/web-cloud.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/app-stranger-web:latest
+            ghcr.io/${{ github.repository_owner }}/app-stranger-web:${{ github.event.workflow_run.head_sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      # Targets the Strato Windows server's OpenSSH Server. Assumes its default
+      # shell has been set to PowerShell (one-time setup: see infra/docker's
+      # deployment notes) and that the repo has already been cloned once by hand to
+      # the path below — this job only pulls + redeploys, it never clones fresh.
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.STRATO_HOST }}
+          username: ${{ secrets.STRATO_SSH_USER }}
+          key: ${{ secrets.STRATO_SSH_KEY }}
+          shell: powershell
+          script: |
+            Set-Location $env:STRATO_APP_DIR
+            git pull --ff-only
+            docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.cloud.yml --env-file infra/docker/.env.cloud pull
+            docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.cloud.yml --env-file infra/docker/.env.cloud up -d
+            docker image prune -f
+          envs: STRATO_APP_DIR
+        env:
+          STRATO_APP_DIR: ${{ secrets.STRATO_APP_DIR }}
+
+  build-and-distribute-android:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      # Points the APK at the same public endpoint the web build reaches via Caddy
+      # (docker/Caddyfile) — unlike the web build, mobile has no shared origin to be
+      # relative against, so these must be absolute. `vars.SITE_ADDRESS` is a plain
+      # (non-secret) repo variable holding the sslip.io hostname.
+      #
+      # Uses Flutter's default debug signing (no release keystore configured) — fine
+      # for Firebase App Distribution test installs, NOT suitable for Play Store
+      # submission; a real release keystore is a separate, later piece of work.
+      - name: Build release APK
+        working-directory: apps/stranger_flutter
+        run: |
+          flutter pub get
+          flutter build apk --release \
+            --dart-define=IDENTITY_BASE_URL=https://${{ vars.SITE_ADDRESS }}/api/identity-profile \
+            --dart-define=OFFER_BASE_URL=https://${{ vars.SITE_ADDRESS }}/api/offer \
+            --dart-define=DISCOVERY_BASE_URL=https://${{ vars.SITE_ADDRESS }}/api/discovery-location \
+            --dart-define=PARTICIPATION_BASE_URL=https://${{ vars.SITE_ADDRESS }}/api/participation \
+            --dart-define=MESSAGING_BASE_URL=https://${{ vars.SITE_ADDRESS }}/api/messaging \
+            --dart-define=TRUST_SAFETY_BASE_URL=https://${{ vars.SITE_ADDRESS }}/api/trust-safety \
+            --dart-define=ENTITLEMENTS_BASE_URL=https://${{ vars.SITE_ADDRESS }}/api/entitlements-billing \
+            --dart-define=NOTIFICATION_BASE_URL=https://${{ vars.SITE_ADDRESS }}/api/notification \
+            --dart-define=MEDIA_BASE_URL=https://${{ vars.SITE_ADDRESS }}/api/media
+
+      - name: Upload to Firebase App Distribution
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-sa.json"
+          npx --yes firebase-tools appdistribution:distribute \
+            apps/stranger_flutter/build/app/outputs/flutter-apk/app-release.apk \
+            --app "${{ secrets.FIREBASE_APP_ID }}" \
+            --groups "testers" \
+            --credential-file "$RUNNER_TEMP/firebase-sa.json"

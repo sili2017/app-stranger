@@ -1,0 +1,400 @@
+version: "3.9"
+
+# Cloud test/staging deployment for the existing Strato Windows server (Docker
+# Desktop + WSL2) — see docs/architecture/decisions.md and the deployment plan for
+# rationale. Self-contained (doesn't layer on `docker-compose.prod.yml`, which stays
+# as the Windows-Docker-Desktop-on-this-same-machine baseline this file was cloned
+# from) so there's exactly one file describing "what runs in the cloud test env,"
+# rather than juggling YAML merge semantics across three files. Run with:
+#
+#   docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.cloud.yml \
+#     --env-file infra/docker/.env.cloud up -d
+#
+# Differences from docker-compose.prod.yml:
+#   - Backend services pull a pre-built image from GHCR (built by
+#     .github/workflows/deploy.yml) instead of building on the host — the host is a
+#     shared Windows box, not a dedicated CI runner, so keep it light.
+#   - A real Kafka broker (KRaft, single node) backs EVENT_BUS_DRIVER=kafka on every
+#     service, matching scripts/startStop/start.sh's local-dev wiring — previously
+#     docker-compose.prod.yml had no Kafka service at all and silently ran on the
+#     Redis event-bus substitute (see plan: "Kafka is not actually wired into any
+#     Docker Compose file today").
+#   - `media` talks to AWS S3 (STORAGE_DRIVER=s3) instead of a local volume — see
+#     services/media/src/storage/storage-adapter-factory.ts, already implemented.
+#   - `web` is Caddy, not nginx — gets automatic Let's Encrypt HTTPS for
+#     $SITE_ADDRESS (a free sslip.io hostname built from this server's static IP)
+#     with ~5 lines of config instead of hand-rolled certbot.
+#   - Postgres instances are tuned down (shared_buffers/max_connections) to fit a
+#     4-8GB WSL2 memory budget shared with 10 Node processes and a JVM.
+#
+# Copy .env.cloud.example to .env.cloud and fill in real values before first run;
+# never commit .env.cloud.
+
+x-backend-common: &backend-common
+  restart: unless-stopped
+  image: ${BACKEND_IMAGE:-ghcr.io/sili2017/app-stranger-backend:latest}
+
+x-postgres-tuning: &postgres-tuning
+  command: postgres -c shared_buffers=32MB -c max_connections=50
+
+services:
+  redis:
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  kafka:
+    image: apache/kafka:3.8.0
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_HEAP_OPTS: "-Xmx512m -Xms512m"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  postgres-identity-profile:
+    <<: *postgres-tuning
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U identity_profile"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-offer:
+    <<: *postgres-tuning
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U offer"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-discovery-location:
+    <<: *postgres-tuning
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U discovery_location"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-participation:
+    <<: *postgres-tuning
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U participation"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-messaging:
+    <<: *postgres-tuning
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U messaging"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-trust-safety:
+    <<: *postgres-tuning
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5437:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trust_safety"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-entitlements-billing:
+    <<: *postgres-tuning
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5438:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U entitlements_billing"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-notification:
+    <<: *postgres-tuning
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5439:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notification"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-media:
+    <<: *postgres-tuning
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5440:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U media"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  identity-profile:
+    <<: *backend-common
+    environment:
+      SERVICE_NAME: identity-profile
+      PORT: 3001
+      REDIS_URL: redis://redis:6379
+      EVENT_BUS_DRIVER: kafka
+      KAFKA_BROKERS: kafka:9092
+      DATABASE_URL: postgresql://identity_profile:${DB_PASSWORD}@postgres-identity-profile:5432/identity_profile?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      postgres-identity-profile:
+        condition: service_healthy
+
+  offer:
+    <<: *backend-common
+    environment:
+      SERVICE_NAME: offer
+      PORT: 3002
+      REDIS_URL: redis://redis:6379
+      EVENT_BUS_DRIVER: kafka
+      KAFKA_BROKERS: kafka:9092
+      DATABASE_URL: postgresql://offer:${DB_PASSWORD}@postgres-offer:5432/offer?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      postgres-offer:
+        condition: service_healthy
+
+  discovery-location:
+    <<: *backend-common
+    environment:
+      SERVICE_NAME: discovery-location
+      PORT: 3003
+      REDIS_URL: redis://redis:6379
+      EVENT_BUS_DRIVER: kafka
+      KAFKA_BROKERS: kafka:9092
+      DATABASE_URL: postgresql://discovery_location:${DB_PASSWORD}@postgres-discovery-location:5432/discovery_location?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      postgres-discovery-location:
+        condition: service_healthy
+
+  participation:
+    <<: *backend-common
+    environment:
+      SERVICE_NAME: participation
+      PORT: 3004
+      REDIS_URL: redis://redis:6379
+      EVENT_BUS_DRIVER: kafka
+      KAFKA_BROKERS: kafka:9092
+      DATABASE_URL: postgresql://participation:${DB_PASSWORD}@postgres-participation:5432/participation?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      postgres-participation:
+        condition: service_healthy
+
+  messaging:
+    <<: *backend-common
+    environment:
+      SERVICE_NAME: messaging
+      PORT: 3005
+      REDIS_URL: redis://redis:6379
+      EVENT_BUS_DRIVER: kafka
+      KAFKA_BROKERS: kafka:9092
+      DATABASE_URL: postgresql://messaging:${DB_PASSWORD}@postgres-messaging:5432/messaging?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      postgres-messaging:
+        condition: service_healthy
+
+  trust-safety:
+    <<: *backend-common
+    environment:
+      SERVICE_NAME: trust-safety
+      PORT: 3006
+      REDIS_URL: redis://redis:6379
+      EVENT_BUS_DRIVER: kafka
+      KAFKA_BROKERS: kafka:9092
+      DATABASE_URL: postgresql://trust_safety:${DB_PASSWORD}@postgres-trust-safety:5432/trust_safety?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      postgres-trust-safety:
+        condition: service_healthy
+
+  entitlements-billing:
+    <<: *backend-common
+    environment:
+      SERVICE_NAME: entitlements-billing
+      PORT: 3007
+      REDIS_URL: redis://redis:6379
+      EVENT_BUS_DRIVER: kafka
+      KAFKA_BROKERS: kafka:9092
+      DATABASE_URL: postgresql://entitlements_billing:${DB_PASSWORD}@postgres-entitlements-billing:5432/entitlements_billing?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      postgres-entitlements-billing:
+        condition: service_healthy
+
+  notification:
+    <<: *backend-common
+    environment:
+      SERVICE_NAME: notification
+      PORT: 3008
+      REDIS_URL: redis://redis:6379
+      EVENT_BUS_DRIVER: kafka
+      KAFKA_BROKERS: kafka:9092
+      DATABASE_URL: postgresql://notification:${DB_PASSWORD}@postgres-notification:5432/notification?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      postgres-notification:
+        condition: service_healthy
+
+  media:
+    <<: *backend-common
+    environment:
+      SERVICE_NAME: media
+      PORT: 3009
+      REDIS_URL: redis://redis:6379
+      EVENT_BUS_DRIVER: kafka
+      KAFKA_BROKERS: kafka:9092
+      STORAGE_DRIVER: s3
+      S3_BUCKET: ${S3_BUCKET}
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      DATABASE_URL: postgresql://media:${DB_PASSWORD}@postgres-media:5432/media?schema=public
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      postgres-media:
+        condition: service_healthy
+
+  api-gateway:
+    <<: *backend-common
+    environment:
+      SERVICE_NAME: api-gateway
+      PORT: 3000
+      REDIS_URL: redis://redis:6379
+      EVENT_BUS_DRIVER: kafka
+      KAFKA_BROKERS: kafka:9092
+      DEV_OIDC_SECRET: ${DEV_OIDC_SECRET:-dev-only-please-set-a-real-secret}
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  web:
+    image: ${WEB_IMAGE:-ghcr.io/sili2017/app-stranger-web:latest}
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      identity-profile:
+        condition: service_healthy
+      offer:
+        condition: service_healthy
+      discovery-location:
+        condition: service_healthy
+      participation:
+        condition: service_healthy
+      messaging:
+        condition: service_healthy
+      trust-safety:
+        condition: service_healthy
+      entitlements-billing:
+        condition: service_healthy
+      notification:
+        condition: service_healthy
+      media:
+        condition: service_healthy
+
+volumes:
+  kafka-data:
+  caddy-data:
+  caddy-config:
