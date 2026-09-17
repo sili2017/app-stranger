@@ -9,8 +9,14 @@
 # the Docker network; the 9 domain services stay internal-only.
 
 FROM ghcr.io/cirruslabs/flutter:stable AS build
-WORKDIR /app
-COPY apps/stranger_flutter/pubspec.yaml apps/stranger_flutter/pubspec.lock ./
+# pubspec.yaml's stranger_design_system dependency is `path:
+# ../../packages/dart-design-system`, resolved relative to this app's own directory
+# — the real repo layout has to be preserved under the build context (not flattened
+# into /app) or `flutter pub get` can't find it.
+WORKDIR /repo
+COPY apps/stranger_flutter/pubspec.yaml apps/stranger_flutter/pubspec.lock apps/stranger_flutter/
+COPY packages/dart-design-system packages/dart-design-system
+WORKDIR /repo/apps/stranger_flutter
 RUN flutter pub get
 COPY apps/stranger_flutter .
 
@@ -38,5 +44,5 @@ RUN flutter build web --release \
       --dart-define=MEDIA_BASE_URL=${MEDIA_BASE_URL}
 
 FROM nginx:1.27-alpine AS runtime
-COPY --from=build /app/build/web /usr/share/nginx/html
+COPY --from=build /repo/apps/stranger_flutter/build/web /usr/share/nginx/html
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
