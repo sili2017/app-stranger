@@ -71,7 +71,6 @@ jobs:
           host: ${{ secrets.STRATO_HOST }}
           username: ${{ secrets.STRATO_SSH_USER }}
           key: ${{ secrets.STRATO_SSH_KEY }}
-          shell: powershell
           script: |
             Set-Location $env:STRATO_APP_DIR
             git pull --ff-only
