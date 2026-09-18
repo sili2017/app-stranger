@@ -98,11 +98,11 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit 1 }
 
             $upSucceeded = $false
-            for ($i = 1; $i -le 5; $i++) {
+            for ($i = 1; $i -le 12; $i++) {
               docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.cloud.yml --env-file infra/docker/.env.cloud up -d
               if ($LASTEXITCODE -eq 0) { $upSucceeded = $true; break }
-              Write-Host "docker compose up -d failed (attempt $i/5), retrying in 10s..."
-              Start-Sleep -Seconds 10
+              Write-Host "docker compose up -d failed (attempt $i/12), retrying in 15s..."
+              Start-Sleep -Seconds 15
             }
             if (-not $upSucceeded) { exit 1 }
 
