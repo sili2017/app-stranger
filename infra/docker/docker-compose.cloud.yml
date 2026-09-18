@@ -29,6 +29,21 @@ version: "3.9"
 #
 # Copy .env.cloud.example to .env.cloud and fill in real values before first run;
 # never commit .env.cloud.
+#
+# Redis and every Postgres instance intentionally have NO host `ports:` mapping —
+# the app only ever reaches them over the internal Docker network by container name
+# (e.g. postgres-identity-profile:5432), so publishing them to the host was already
+# pure convenience, never a functional requirement. It turned out to be actively
+# harmful on this Docker Desktop/WSL2 host: every container with a host port mapping
+# was silently ending up with NO network attachment at all (visible via `docker
+# inspect ... NetworkSettings.Networks`, empty) while still reporting "healthy"
+# (its healthcheck runs via `docker exec`, which doesn't need networking) — so every
+# dependent service failed with Prisma P1001 even though Postgres was actually fine.
+# Reproduced from a clean `docker compose down` and a full Docker Desktop/WSL2
+# restart, so it isn't leftover state — it's this host's Docker Desktop networking
+# breaking specifically on the network-attach + host-port-forward combination under
+# concurrent container startup. If you need direct DB access for debugging, use
+# `docker exec -it <container> psql ...` instead of publishing a host port.
 
 x-backend-common: &backend-common
   restart: unless-stopped
@@ -40,8 +55,6 @@ x-postgres-tuning: &postgres-tuning
 services:
   redis:
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -83,8 +96,6 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U identity_profile"]
       interval: 5s
@@ -96,8 +107,6 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "127.0.0.1:5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U offer"]
       interval: 5s
@@ -109,8 +118,6 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "127.0.0.1:5434:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U discovery_location"]
       interval: 5s
@@ -122,8 +129,6 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "127.0.0.1:5435:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U participation"]
       interval: 5s
@@ -135,8 +140,6 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "127.0.0.1:5436:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U messaging"]
       interval: 5s
@@ -148,8 +151,6 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "127.0.0.1:5437:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U trust_safety"]
       interval: 5s
@@ -161,8 +162,6 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "127.0.0.1:5438:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U entitlements_billing"]
       interval: 5s
@@ -174,8 +173,6 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "127.0.0.1:5439:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U notification"]
       interval: 5s
@@ -187,8 +184,6 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "127.0.0.1:5440:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U media"]
       interval: 5s
