@@ -72,6 +72,15 @@ jobs:
       # default ErrorActionPreference treats as terminating) under our PowerShell
       # remote shell, so $env:STRATO_APP_DIR was always empty and every step below
       # ran from the wrong directory while still reporting success.
+      #
+      # $ErrorActionPreference only catches PowerShell cmdlet errors, not exit codes
+      # from native commands like git/docker — those need an explicit $LASTEXITCODE
+      # check or the script silently continues past a failed step and still reports
+      # success. `docker compose up -d` also gets a few retries: Docker Desktop's
+      # Windows/WSL2 networking occasionally fails a fresh container's host-port
+      # bind with "address already in use" even though nothing is actually listening
+      # (a transient HNS race observed repeatedly standing this environment up) —
+      # it reliably succeeds a few seconds later without any other change.
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -81,9 +90,22 @@ jobs:
           script: |
             $ErrorActionPreference = "Stop"
             Set-Location "${{ secrets.STRATO_APP_DIR }}"
+
             git pull --ff-only
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+
             docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.cloud.yml --env-file infra/docker/.env.cloud pull
-            docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.cloud.yml --env-file infra/docker/.env.cloud up -d
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+
+            $upSucceeded = $false
+            for ($i = 1; $i -le 5; $i++) {
+              docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.cloud.yml --env-file infra/docker/.env.cloud up -d
+              if ($LASTEXITCODE -eq 0) { $upSucceeded = $true; break }
+              Write-Host "docker compose up -d failed (attempt $i/5), retrying in 10s..."
+              Start-Sleep -Seconds 10
+            }
+            if (-not $upSucceeded) { exit 1 }
+
             docker image prune -f
 
   build-and-distribute-android:
