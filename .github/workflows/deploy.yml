@@ -65,6 +65,13 @@ jobs:
       # shell has been set to PowerShell (one-time setup: see infra/docker's
       # deployment notes) and that the repo has already been cloned once by hand to
       # the path below — this job only pulls + redeploys, it never clones fresh.
+      #
+      # STRATO_APP_DIR is interpolated directly into the script rather than passed
+      # via the action's `envs:` input, which injects variables with bash's `export`
+      # syntax — that's a no-op (silently ignored, not even an error PowerShell's
+      # default ErrorActionPreference treats as terminating) under our PowerShell
+      # remote shell, so $env:STRATO_APP_DIR was always empty and every step below
+      # ran from the wrong directory while still reporting success.
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -72,14 +79,12 @@ jobs:
           username: ${{ secrets.STRATO_SSH_USER }}
           key: ${{ secrets.STRATO_SSH_KEY }}
           script: |
-            Set-Location $env:STRATO_APP_DIR
+            $ErrorActionPreference = "Stop"
+            Set-Location "${{ secrets.STRATO_APP_DIR }}"
             git pull --ff-only
             docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.cloud.yml --env-file infra/docker/.env.cloud pull
             docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.cloud.yml --env-file infra/docker/.env.cloud up -d
             docker image prune -f
-          envs: STRATO_APP_DIR
-        env:
-          STRATO_APP_DIR: ${{ secrets.STRATO_APP_DIR }}
 
   build-and-distribute-android:
     if: github.event.workflow_run.conclusion == 'success'
