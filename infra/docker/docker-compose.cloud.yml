@@ -67,9 +67,14 @@ services:
     volumes:
       - kafka-data:/var/lib/kafka/data
     healthcheck:
+      # timeout is generous because kafka-broker-api-versions.sh spins up a JVM per
+      # invocation, and under the load of the whole stack starting concurrently
+      # (9 Postgres instances + Redis + every backend service) that routinely takes
+      # well over 5s, failing an otherwise-healthy broker's check on resource
+      # contention alone.
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:9092 >/dev/null 2>&1"]
       interval: 10s
-      timeout: 5s
+      timeout: 20s
       retries: 15
       start_period: 30s
 
