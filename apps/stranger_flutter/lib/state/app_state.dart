@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show ThemeMode;
+import 'package:stranger_design_system/stranger_design_system.dart';
 import '../config/api_config.dart';
 import '../core/api_client.dart';
 import '../core/session.dart';
@@ -88,6 +90,29 @@ class AppState extends ChangeNotifier {
 
   Future<void> setLanguageOverride(String? languageCode) async {
     await session.setLanguageOverride(languageCode);
+    notifyListeners();
+  }
+
+  /// Item 41: accent palette — Profile > Appearance. Defaults to
+  /// [AppPalette.classic] until the user picks something else.
+  AppPalette get palette => AppPalette.values.firstWhere(
+        (p) => p.name == session.paletteName,
+        orElse: () => AppPalette.classic,
+      );
+
+  Future<void> setPalette(AppPalette palette) async {
+    await session.setPaletteName(palette.name);
+    notifyListeners();
+  }
+
+  /// Item 41: light/dark/system — defaults to following the device.
+  ThemeMode get themeMode => ThemeMode.values.firstWhere(
+        (m) => m.name == session.themeModeName,
+        orElse: () => ThemeMode.system,
+      );
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    await session.setThemeModeName(mode.name);
     notifyListeners();
   }
 

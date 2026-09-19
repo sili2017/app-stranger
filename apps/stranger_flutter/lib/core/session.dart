@@ -17,6 +17,8 @@ class Session {
   static const _localeKey = 'language_override';
   static const _pushEnabledKey = 'push_enabled';
   static const _locationRationaleSeenKey = 'location_rationale_seen';
+  static const _paletteKey = 'app_palette';
+  static const _themeModeKey = 'app_theme_mode';
 
   static Future<Session> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -82,4 +84,17 @@ class Session {
 
   Future<void> setHasSeenLocationRationale() =>
       _prefs.setBool(_locationRationaleSeenKey, true);
+
+  /// Item 41: the user's chosen accent palette — stored as the [AppPalette] enum
+  /// name; null means "not chosen yet", which AppState maps to [AppPalette.classic].
+  String? get paletteName => _prefs.getString(_paletteKey);
+
+  Future<void> setPaletteName(String name) =>
+      _prefs.setString(_paletteKey, name);
+
+  /// 'system' | 'light' | 'dark' | null (== system) — matches [ThemeMode]'s name.
+  String? get themeModeName => _prefs.getString(_themeModeKey);
+
+  Future<void> setThemeModeName(String name) =>
+      _prefs.setString(_themeModeKey, name);
 }

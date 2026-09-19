@@ -213,6 +213,13 @@
   "profileLanguageSystemDefault": "सिस्टम डिफ़ॉल्ट",
   "profileSecureAccountBanner": "एक ईमेल और पासवर्ड जोड़ें ताकि आप किसी भी डिवाइस से अपने खाते में वापस आ सकें।",
   "profileSecureAccountAction": "खाता सुरक्षित करें",
+  "profileAppearance": "दिखावट",
+  "profileThemeMode": "थीम",
+  "profileThemeSystem": "सिस्टम",
+  "profileThemeLight": "हल्का",
+  "profileThemeDark": "गहरा",
+  "profileColorPalette": "रंग",
+  "profileAppearanceDone": "हो गया",
 
   "safetyTitle": "सुरक्षा",
   "safetyGuidanceHeading": "मिलने से पहले",

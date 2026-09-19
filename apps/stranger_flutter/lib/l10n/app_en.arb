@@ -213,6 +213,13 @@
   "profileLanguageSystemDefault": "System default",
   "profileSecureAccountBanner": "Add an email and password so you can get back into your account from any device.",
   "profileSecureAccountAction": "Secure account",
+  "profileAppearance": "Appearance",
+  "profileThemeMode": "Theme",
+  "profileThemeSystem": "System",
+  "profileThemeLight": "Light",
+  "profileThemeDark": "Dark",
+  "profileColorPalette": "Color",
+  "profileAppearanceDone": "Done",
 
   "safetyTitle": "Safety",
   "safetyGuidanceHeading": "Before you meet",

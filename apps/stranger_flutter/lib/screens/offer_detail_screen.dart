@@ -224,6 +224,11 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
         ).showSnackBar(SnackBar(content: Text(l10n.offerInterestSent)));
       }
       await _load();
+      // Item 37: let the sent-state (heart icon on the button) register with the
+      // user for a beat, then return them to the feed rather than leaving them
+      // stranded on a now-inert detail screen with nothing left to do here.
+      await Future.delayed(const Duration(seconds: 3));
+      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (mounted) showErrorSnackBar(context, e);
     } finally {

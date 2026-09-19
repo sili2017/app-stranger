@@ -102,9 +102,9 @@ class StrangerApp extends StatelessWidget {
           return MaterialApp(
             title: 'Stranger',
             debugShowCheckedModeBanner: false,
-            theme: strangerTheme,
-            darkTheme: strangerDarkTheme,
-            themeMode: ThemeMode.system,
+            theme: buildStrangerTheme(appState.palette, Brightness.light),
+            darkTheme: buildStrangerTheme(appState.palette, Brightness.dark),
+            themeMode: appState.themeMode,
             locale: override == null ? null : Locale(override),
             localizationsDelegates: const [
               AppLocalizations.delegate,

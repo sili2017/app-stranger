@@ -36,7 +36,8 @@ enum LocationFailureReason {
 /// own explicit `timeout` option fires — so relying on the platform alone left the
 /// button spinning forever. This wraps the call in a plain Dart timer that always
 /// completes, regardless of what the platform does underneath.
-const _fixTimeout = Duration(seconds: 12);
+const _fixTimeout = Duration(seconds: 15);
+const _fallbackFixTimeout = Duration(seconds: 8);
 
 class LocationService {
   /// Set after a failed [getCurrentLocation] call (cleared at the start of the next
@@ -53,17 +54,30 @@ class LocationService {
       return _lastKnownFallback();
     }
 
-    try {
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: _fixTimeout,
-      ).timeout(_fixTimeout + const Duration(seconds: 2));
-      return LocationResult(
-          lat: position.latitude, lng: position.longitude, isLiveFix: true);
-    } catch (e) {
-      _recordFailureReason(e);
-      return _lastKnownFallback();
+    // This app only needs city/km-band-level precision (see the distance-band
+    // filter — <1km/1-5km/5-15km/15km+), never turn-by-turn accuracy, so
+    // `.high` (GPS-satellite-grade, can take 30s+ to lock indoors/without sky
+    // view) was demanding far more than needed and regularly timing out with
+    // nothing to fall back to on a device that had never gotten a fix before.
+    // `.medium` resolves via network/WiFi positioning too, not just GPS, and
+    // is dramatically faster in practice; if that still fails, one more quick
+    // attempt at the lowest accuracy tier before giving up on a live fix.
+    for (final attempt in [
+      (LocationAccuracy.medium, _fixTimeout),
+      (LocationAccuracy.lowest, _fallbackFixTimeout),
+    ]) {
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: attempt.$1,
+          timeLimit: attempt.$2,
+        ).timeout(attempt.$2 + const Duration(seconds: 2));
+        return LocationResult(
+            lat: position.latitude, lng: position.longitude, isLiveFix: true);
+      } catch (e) {
+        _recordFailureReason(e);
+      }
     }
+    return _lastKnownFallback();
   }
 
   Future<LocationResult?> _lastKnownFallback() async {

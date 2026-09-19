@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:stranger_design_system/stranger_design_system.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../l10n/status_labels.dart';
 import '../layout/responsive.dart';
@@ -143,6 +144,103 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (selected != current) {
       await appState.setLanguageOverride(selected);
     }
+  }
+
+  /// Item 41: theme mode and accent color are applied live as the user taps —
+  /// no separate "confirm" step, same as most trending apps' appearance
+  /// pickers (Telegram, Notion, …), since either choice is instantly visible
+  /// and trivially reversible.
+  Future<void> _pickAppearance() async {
+    final l10n = AppLocalizations.of(context)!;
+    await showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md, 0, AppSpacing.md, AppSpacing.lg),
+          child: Consumer<AppState>(
+            builder: (context, appState, _) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l10n.profileAppearance,
+                    style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: AppSpacing.lg),
+                Text(l10n.profileThemeMode,
+                    style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: AppSpacing.sm),
+                SegmentedButton<ThemeMode>(
+                  segments: [
+                    ButtonSegment(
+                      value: ThemeMode.system,
+                      label: Text(l10n.profileThemeSystem),
+                      icon: const Icon(Icons.brightness_auto_outlined),
+                    ),
+                    ButtonSegment(
+                      value: ThemeMode.light,
+                      label: Text(l10n.profileThemeLight),
+                      icon: const Icon(Icons.light_mode_outlined),
+                    ),
+                    ButtonSegment(
+                      value: ThemeMode.dark,
+                      label: Text(l10n.profileThemeDark),
+                      icon: const Icon(Icons.dark_mode_outlined),
+                    ),
+                  ],
+                  selected: {appState.themeMode},
+                  onSelectionChanged: (selection) =>
+                      appState.setThemeMode(selection.first),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text(l10n.profileColorPalette,
+                    style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.md,
+                  runSpacing: AppSpacing.sm,
+                  children: AppPalette.values.map((palette) {
+                    final selected = appState.palette == palette;
+                    return GestureDetector(
+                      onTap: () => appState.setPalette(palette),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: palette.seedColor,
+                              shape: BoxShape.circle,
+                              border: selected
+                                  ? Border.all(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface,
+                                      width: 2,
+                                    )
+                                  : null,
+                            ),
+                            alignment: Alignment.center,
+                            child: selected
+                                ? const Icon(Icons.check,
+                                    color: Colors.white, size: 20)
+                                : null,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(palette.label,
+                              style: Theme.of(context).textTheme.bodySmall),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -331,6 +429,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const SafetyScreen()),
               ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.palette_outlined),
+              title: Text(l10n.profileAppearance),
+              subtitle: Text(context.watch<AppState>().palette.label),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _pickAppearance,
             ),
             ListTile(
               leading: const Icon(Icons.language_outlined),
