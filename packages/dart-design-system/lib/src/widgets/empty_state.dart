@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../tokens.dart';
 
 /// A friendlier "nothing here" state — a soft icon badge, a headline, and an
@@ -47,8 +48,9 @@ class AppEmptyState extends StatelessWidget {
               const SizedBox(height: AppSpacing.xs),
               Text(
                 message!,
-                style: textTheme.bodyMedium
-                    ?.copyWith(color: scheme.onSurfaceVariant),
+                style: textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],

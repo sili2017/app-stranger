@@ -610,13 +610,11 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
                                   recipientUserId,
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
-                            if ((eoi['message'] as String?)
-                                    ?.isNotEmpty ==
+                            if ((eoi['message'] as String?)?.isNotEmpty ==
                                 true) ...[
                               const SizedBox(height: AppSpacing.xs),
                               Text(eoi['message'] as String,
-                                  style:
-                                      Theme.of(context).textTheme.bodySmall),
+                                  style: Theme.of(context).textTheme.bodySmall),
                             ],
                           ],
                         ),
@@ -627,8 +625,7 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
                               icon: const Icon(Icons.check_circle,
                                   color: Colors.green),
                               tooltip: l10n.offerSelected,
-                              onPressed:
-                                  _busy ? null : _openChatForSelection,
+                              onPressed: _busy ? null : _openChatForSelection,
                             )
                           : FilledButton(
                               onPressed: (_busy || !offer.isActive)

@@ -155,9 +155,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                       message: m,
                                       isMine: isMine,
                                       showAvatar: showAvatar,
-                                      senderName:
-                                          _senderNames[m.senderId] ??
-                                              m.senderId,
+                                      senderName: _senderNames[m.senderId] ??
+                                          m.senderId,
                                     ),
                                   ),
                                 );
@@ -173,7 +172,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       Icon(Icons.archive_outlined,
                           size: 18,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant),
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(child: Text(l10n.chatArchivedNotice)),
                     ],
@@ -195,8 +195,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         decoration: InputDecoration(
                           hintText: l10n.chatMessageHint,
                           border: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppRadius.lg),
+                            borderRadius: BorderRadius.circular(AppRadius.lg),
                             borderSide: BorderSide.none,
                           ),
                         ),
@@ -212,8 +211,8 @@ class _ChatScreenState extends State<ChatScreen> {
                               height: 40,
                               child: Padding(
                                 padding: EdgeInsets.all(8),
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               ),
                             )
                           : IconButton.filled(
@@ -307,8 +306,8 @@ class _MessageBubble extends StatelessWidget {
             backgroundColor: scheme.secondaryContainer,
             child: Text(
               senderName.isNotEmpty ? senderName[0].toUpperCase() : '?',
-              style: TextStyle(
-                  fontSize: 12, color: scheme.onSecondaryContainer),
+              style:
+                  TextStyle(fontSize: 12, color: scheme.onSecondaryContainer),
             ),
           ),
           const SizedBox(width: AppSpacing.xs),

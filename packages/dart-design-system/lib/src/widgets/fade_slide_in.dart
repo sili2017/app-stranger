@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../tokens.dart';
 
 /// Fades + slides a child in on first build, optionally after [delay] — wrap
@@ -26,8 +27,10 @@ class _FadeSlideInState extends State<FadeSlideIn>
     vsync: this,
     duration: AppMotion.slow,
   );
-  late final Animation<double> _curved =
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+  late final Animation<double> _curved = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeOutCubic,
+  );
 
   @override
   void initState() {

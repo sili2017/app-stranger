@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../tokens.dart';
 
 enum StatusTone { neutral, positive, warning, danger, info }
@@ -23,21 +24,20 @@ class StatusBadge extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final (bg, fg) = switch (tone) {
       StatusTone.neutral => (scheme.surfaceContainerHigh, scheme.onSurface),
-      StatusTone.positive => (
-          const Color(0xFFD7F2DE),
-          const Color(0xFF1E7A3B)
-        ),
-      StatusTone.warning => (
-          const Color(0xFFFBEBCE),
-          const Color(0xFF8A5A00)
-        ),
+      StatusTone.positive => (const Color(0xFFD7F2DE), const Color(0xFF1E7A3B)),
+      StatusTone.warning => (const Color(0xFFFBEBCE), const Color(0xFF8A5A00)),
       StatusTone.danger => (scheme.errorContainer, scheme.onErrorContainer),
-      StatusTone.info => (scheme.secondaryContainer, scheme.onSecondaryContainer),
+      StatusTone.info => (
+        scheme.secondaryContainer,
+        scheme.onSecondaryContainer,
+      ),
     };
 
     return Container(
       padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(AppRadius.pill),
@@ -51,10 +51,7 @@ class StatusBadge extends StatelessWidget {
           ],
           Text(
             label,
-            style: Theme.of(context)
-                .textTheme
-                .labelMedium
-                ?.copyWith(color: fg),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(color: fg),
           ),
         ],
       ),

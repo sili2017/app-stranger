@@ -20,8 +20,7 @@ class SkeletonListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        children:
-            List.generate(count, (_) => const SkeletonListTile()),
+        children: List.generate(count, (_) => const SkeletonListTile()),
       );
 }
 

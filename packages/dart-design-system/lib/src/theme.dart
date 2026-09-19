@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'tokens.dart';
 
 const _seedColor = Color(0xFF6750A4);
@@ -50,7 +51,9 @@ ThemeData _buildTheme(Brightness brightness) {
       backgroundColor: colorScheme.surfaceContainerHigh,
       labelStyle: _textTheme.labelMedium,
       padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
@@ -58,7 +61,9 @@ ThemeData _buildTheme(Brightness brightness) {
           borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.sm,
+        ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -67,7 +72,9 @@ ThemeData _buildTheme(Brightness brightness) {
           borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.sm,
+        ),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
@@ -78,7 +85,9 @@ ThemeData _buildTheme(Brightness brightness) {
         borderSide: BorderSide.none,
       ),
       contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
     ),
     visualDensity: VisualDensity.standard,
   );
@@ -90,9 +99,15 @@ ThemeData _buildTheme(Brightness brightness) {
 // the same default size.
 const _textTheme = TextTheme(
   headlineMedium: TextStyle(
-      fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+    fontSize: 28,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.5,
+  ),
   headlineSmall: TextStyle(
-      fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.25),
+    fontSize: 24,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.25,
+  ),
   titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
   titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
   titleSmall: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),

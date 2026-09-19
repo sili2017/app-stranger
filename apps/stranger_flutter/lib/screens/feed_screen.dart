@@ -159,28 +159,28 @@ class _FeedScreenState extends State<FeedScreen> {
                 )
               else
                 ..._items!.asMap().entries.map(
-                  (entry) => Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    child: FadeSlideIn(
-                      delay: Duration(milliseconds: entry.key * 40),
-                      child: FeedItemCard(
-                        item: entry.value,
-                        // Refresh on return — see my_offers_screen.dart's onTap
-                        // for why (expressing interest, or the offer resolving,
-                        // changes state a plain push-and-forget would leave
-                        // stale here).
-                        onTap: () => Navigator.of(context)
-                            .push(
-                              MaterialPageRoute(
-                                builder: (_) => OfferDetailScreen(
-                                    offerId: entry.value.offerId),
-                              ),
-                            )
-                            .then((_) => _refresh()),
+                      (entry) => Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: FadeSlideIn(
+                          delay: Duration(milliseconds: entry.key * 40),
+                          child: FeedItemCard(
+                            item: entry.value,
+                            // Refresh on return — see my_offers_screen.dart's onTap
+                            // for why (expressing interest, or the offer resolving,
+                            // changes state a plain push-and-forget would leave
+                            // stale here).
+                            onTap: () => Navigator.of(context)
+                                .push(
+                                  MaterialPageRoute(
+                                    builder: (_) => OfferDetailScreen(
+                                        offerId: entry.value.offerId),
+                                  ),
+                                )
+                                .then((_) => _refresh()),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
             ],
           ),
         ),
