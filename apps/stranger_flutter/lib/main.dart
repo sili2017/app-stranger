@@ -14,14 +14,15 @@ import 'screens/home_shell.dart';
 // blank screen with nothing in the OS logs pointing at why. Catch it here
 // and render something instead of nothing.
 void main() {
-  ErrorWidget.builder = (details) => _StartupErrorApp(error: details.exception);
+  ErrorWidget.builder = (details) =>
+      _StartupErrorApp(error: details.exception, stackTrace: details.stack);
   runZonedGuarded(() async {
     try {
       final session = await Session.load();
       runApp(StrangerApp(session: session));
     } catch (error, stackTrace) {
       debugPrint('Startup failed: $error\n$stackTrace');
-      runApp(_StartupErrorApp(error: error));
+      runApp(_StartupErrorApp(error: error, stackTrace: stackTrace));
     }
   }, (error, stackTrace) {
     debugPrint('Uncaught zone error: $error\n$stackTrace');
@@ -29,9 +30,10 @@ void main() {
 }
 
 class _StartupErrorApp extends StatelessWidget {
-  const _StartupErrorApp({required this.error});
+  const _StartupErrorApp({required this.error, this.stackTrace});
 
   final Object error;
+  final StackTrace? stackTrace;
 
   @override
   Widget build(BuildContext context) {
@@ -41,18 +43,32 @@ class _StartupErrorApp extends StatelessWidget {
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Startup failed',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Startup failed',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Text('$error'),
+                if (stackTrace != null) ...[
                   const SizedBox(height: 12),
-                  Text('$error', textAlign: TextAlign.center),
+                  const Text(
+                    'Stack trace:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: SelectableText(
+                        '$stackTrace',
+                        style: const TextStyle(
+                            fontFamily: 'monospace', fontSize: 11),
+                      ),
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         ),
