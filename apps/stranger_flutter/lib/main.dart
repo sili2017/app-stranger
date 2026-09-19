@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -8,9 +10,56 @@ import 'state/app_state.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_shell.dart';
 
-Future<void> main() async {
-  final session = await Session.load();
-  runApp(StrangerApp(session: session));
+// Release builds show no error UI by default, so an exception before the
+// first frame (e.g. Session.load() failing) previously left a permanently
+// blank screen with nothing in the OS logs pointing at why. Catch it here
+// and render something instead of nothing.
+void main() {
+  ErrorWidget.builder = (details) => _StartupErrorApp(error: details.exception);
+  runZonedGuarded(() async {
+    try {
+      final session = await Session.load();
+      runApp(StrangerApp(session: session));
+    } catch (error, stackTrace) {
+      debugPrint('Startup failed: $error\n$stackTrace');
+      runApp(_StartupErrorApp(error: error));
+    }
+  }, (error, stackTrace) {
+    debugPrint('Uncaught zone error: $error\n$stackTrace');
+  });
+}
+
+class _StartupErrorApp extends StatelessWidget {
+  const _StartupErrorApp({required this.error});
+
+  final Object error;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Startup failed',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  Text('$error', textAlign: TextAlign.center),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Root widget. lib/layout/ holds the responsive shell (T116). Localization (T107,
