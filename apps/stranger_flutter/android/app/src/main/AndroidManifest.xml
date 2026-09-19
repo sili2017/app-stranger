@@ -5,6 +5,10 @@
          permission dialog shown at all, rather than actually prompting the user. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- Required on Android 13+ (API 33) for FirebaseMessaging.requestPermission()
+         (push_notification_service.dart) to actually prompt — without it, the OS
+         silently denies with no dialog, same failure pattern as the other two. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="stranger_flutter"
         android:name="${applicationName}"
