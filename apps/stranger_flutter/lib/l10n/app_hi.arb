@@ -69,6 +69,7 @@
       "minutes": {"type": "int"}
     }
   },
+  "feedEndingSoon": "जल्द समाप्त हो रहा है",
 
   "cityInterestsTitle": "शहर रुचियाँ",
   "cityInterestsIdLabel": "शहर आईडी (जैसे mumbai)",

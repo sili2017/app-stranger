@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:stranger_design_system/stranger_design_system.dart';
 import '../core/location_service.dart';
 import '../l10n/gen/app_localizations.dart';
 import '../layout/responsive.dart';
@@ -149,7 +150,7 @@ class _FeedScreenState extends State<FeedScreen> {
                     height: 300,
                     child: ErrorView(error: _error!, onRetry: _refresh))
               else if (_items == null || _locating)
-                const SizedBox(height: 300, child: LoadingView())
+                const SkeletonListView()
               else if (_items!.isEmpty)
                 SizedBox(
                   height: 300,
@@ -157,20 +158,27 @@ class _FeedScreenState extends State<FeedScreen> {
                       message: l10n.feedEmpty, icon: Icons.explore_outlined),
                 )
               else
-                ..._items!.map(
-                  (item) => FeedItemCard(
-                    item: item,
-                    // Refresh on return — see my_offers_screen.dart's onTap for why
-                    // (expressing interest, or the offer resolving, changes state a
-                    // plain push-and-forget would leave stale here).
-                    onTap: () => Navigator.of(context)
-                        .push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                OfferDetailScreen(offerId: item.offerId),
-                          ),
-                        )
-                        .then((_) => _refresh()),
+                ..._items!.asMap().entries.map(
+                  (entry) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: FadeSlideIn(
+                      delay: Duration(milliseconds: entry.key * 40),
+                      child: FeedItemCard(
+                        item: entry.value,
+                        // Refresh on return — see my_offers_screen.dart's onTap
+                        // for why (expressing interest, or the offer resolving,
+                        // changes state a plain push-and-forget would leave
+                        // stale here).
+                        onTap: () => Navigator.of(context)
+                            .push(
+                              MaterialPageRoute(
+                                builder: (_) => OfferDetailScreen(
+                                    offerId: entry.value.offerId),
+                              ),
+                            )
+                            .then((_) => _refresh()),
+                      ),
+                    ),
                   ),
                 ),
             ],
@@ -189,7 +197,6 @@ class _FeedScreenState extends State<FeedScreen> {
             decoration: InputDecoration(
               labelText: l10n.feedFilterActivity,
               isDense: true,
-              border: const OutlineInputBorder(),
             ),
             onSubmitted: (_) => _refresh(),
           ),

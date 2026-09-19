@@ -69,6 +69,7 @@
       "minutes": {"type": "int"}
     }
   },
+  "feedEndingSoon": "Ending soon",
 
   "cityInterestsTitle": "City interests",
   "cityInterestsIdLabel": "City id (e.g. mumbai)",

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import 'package:stranger_design_system/stranger_design_system.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/app_exception.dart';
 import '../l10n/gen/app_localizations.dart';
@@ -388,27 +389,49 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
   Widget _body(BuildContext context, AppLocalizations l10n) {
     final offer = _offer!;
     final minutesLeft = offer.timeRemaining.inMinutes.clamp(0, 999);
+    final statusTone = switch (offer.status) {
+      'active' => StatusTone.positive,
+      'expired' => StatusTone.warning,
+      'stopped' => StatusTone.danger,
+      _ => StatusTone.neutral,
+    };
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       children: [
-        Text(offer.activityText,
-            style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: [
-            Chip(
-              label: Text(
-                '${offerStatusEmoji(offer.status)} ${offerStatusLabel(l10n, offer.status)}',
-              ),
-            ),
-            Chip(label: Text(l10n.offerSpots(offer.capacity))),
-            Chip(label: Text(l10n.offerInterested(offer.interestCount))),
-            if (offer.isActive)
-              Chip(label: Text(l10n.offerMinutesLeft(minutesLeft))),
-          ],
+        FadeSlideIn(
+          child: Text(offer.activityText,
+              style: Theme.of(context).textTheme.headlineSmall),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.sm),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 40),
+          child: Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              StatusBadge(
+                label:
+                    '${offerStatusEmoji(offer.status)} ${offerStatusLabel(l10n, offer.status)}',
+                tone: statusTone,
+              ),
+              StatusBadge(
+                  label: l10n.offerSpots(offer.capacity),
+                  icon: Icons.people_outline),
+              StatusBadge(
+                  label: l10n.offerInterested(offer.interestCount),
+                  icon: Icons.favorite_border),
+              if (offer.isActive)
+                StatusBadge(
+                  label: l10n.offerMinutesLeft(minutesLeft),
+                  icon: Icons.timer_outlined,
+                  tone: minutesLeft <= 15
+                      ? StatusTone.warning
+                      : StatusTone.neutral,
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
         if (offer.moneyPreferenceLabel != null)
           Text(
             offer.moneyPreferenceNote != null
@@ -418,9 +441,12 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
                   )
                 : l10n.offerMoneyPreference(offer.moneyPreferenceLabel!),
           ),
-        const SizedBox(height: 16),
-        _placeCard(context, l10n),
-        const SizedBox(height: 24),
+        const SizedBox(height: AppSpacing.md),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 80),
+          child: _placeCard(context, l10n),
+        ),
+        const SizedBox(height: AppSpacing.lg),
         if (_isCreator)
           _creatorControls(context, l10n)
         else
@@ -430,18 +456,16 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
   }
 
   Widget _placeCard(BuildContext context, AppLocalizations l10n) {
+    final scheme = Theme.of(context).colorScheme;
     if (_place == null) {
-      return Card(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              const Icon(Icons.lock_outline),
-              const SizedBox(width: 8),
-              Expanded(child: Text(l10n.offerPlaceLocked)),
-            ],
-          ),
+      return AppCard(
+        color: scheme.surfaceContainerHigh,
+        child: Row(
+          children: [
+            Icon(Icons.lock_outline, color: scheme.onSurfaceVariant),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(child: Text(l10n.offerPlaceLocked)),
+          ],
         ),
       );
     }
@@ -449,42 +473,50 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
     final lng = (_place!['lng'] as num).toDouble();
     final label = _place!['label'] as String? ?? _shortPlaceName;
     final rendezvous = _place!['rendezvousInstruction'] as String?;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.place_outlined),
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: scheme.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: IconButton(
+                  icon: Icon(Icons.place_outlined,
+                      color: scheme.onPrimaryContainer, size: 20),
                   tooltip: l10n.offerOpenInMaps,
                   onPressed: () => _openInMaps(lat, lng, label),
                 ),
-                Expanded(
-                  child: Text(
-                    label ?? l10n.offerLocationPinned,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-              ],
-            ),
-            if (rendezvous != null) ...[
-              const SizedBox(height: 8),
-              Text(l10n.offerRendezvousInstructions(rendezvous)),
-            ],
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: _busy ? null : _shareMeetup,
-                icon: const Icon(Icons.shield_outlined),
-                label: Text(l10n.safetyShareMeetup),
               ),
-            ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  label ?? l10n.offerLocationPinned,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+            ],
+          ),
+          if (rendezvous != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(l10n.offerRendezvousInstructions(rendezvous)),
           ],
-        ),
+          const SizedBox(height: AppSpacing.xs),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _busy ? null : _shareMeetup,
+              icon: const Icon(Icons.shield_outlined),
+              label: Text(l10n.safetyShareMeetup),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -542,37 +574,71 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
             icon: const Icon(Icons.replay),
             label: Text(l10n.offerRebroadcast),
           ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.md),
         Text(l10n.offerExpressionsOfInterest,
             style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
         if (_expressionsOfInterest == null)
-          const LoadingView()
+          const SkeletonListView(count: 3)
         else if (_expressionsOfInterest!.isEmpty)
-          EmptyView(message: l10n.offerNoInterestYet)
+          EmptyView(
+              message: l10n.offerNoInterestYet, icon: Icons.people_outline)
         else
-          ..._expressionsOfInterest!.map((eoi) {
+          ..._expressionsOfInterest!.asMap().entries.map((entry) {
+            final eoi = entry.value;
             final selected = eoi['selected'] == true;
             final recipientUserId = eoi['recipientUserId'] as String;
-            return Card(
-              child: ListTile(
-                leading: const Icon(Icons.person_outline),
-                title:
-                    Text(_recipientNames[recipientUserId] ?? recipientUserId),
-                subtitle: Text((eoi['message'] as String?) ?? ''),
-                trailing: selected
-                    ? IconButton(
-                        icon:
-                            const Icon(Icons.check_circle, color: Colors.green),
-                        tooltip: l10n.offerSelected,
-                        onPressed: _busy ? null : _openChatForSelection,
-                      )
-                    : FilledButton(
-                        onPressed: (_busy || !offer.isActive)
-                            ? null
-                            : () => _select(eoi['id'] as String),
-                        child: Text(l10n.offerSelect),
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: FadeSlideIn(
+                delay: Duration(milliseconds: entry.key * 40),
+                child: AppCard(
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor:
+                            Theme.of(context).colorScheme.secondaryContainer,
+                        child: const Icon(Icons.person_outline),
                       ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _recipientNames[recipientUserId] ??
+                                  recipientUserId,
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                            if ((eoi['message'] as String?)
+                                    ?.isNotEmpty ==
+                                true) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              Text(eoi['message'] as String,
+                                  style:
+                                      Theme.of(context).textTheme.bodySmall),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      selected
+                          ? IconButton(
+                              icon: const Icon(Icons.check_circle,
+                                  color: Colors.green),
+                              tooltip: l10n.offerSelected,
+                              onPressed:
+                                  _busy ? null : _openChatForSelection,
+                            )
+                          : FilledButton(
+                              onPressed: (_busy || !offer.isActive)
+                                  ? null
+                                  : () => _select(eoi['id'] as String),
+                              child: Text(l10n.offerSelect),
+                            ),
+                    ],
+                  ),
+                ),
               ),
             );
           }),
@@ -593,10 +659,9 @@ class _OfferDetailScreenState extends State<OfferDetailScreen> {
           controller: _messageController,
           decoration: InputDecoration(
             labelText: l10n.offerMessageLabel,
-            border: const OutlineInputBorder(),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.sm),
         FilledButton.icon(
           onPressed: (_busy || _alreadyInterested) ? null : _expressInterest,
           icon: Icon(

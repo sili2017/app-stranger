@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:stranger_design_system/stranger_design_system.dart';
 import '../core/app_exception.dart';
 import '../l10n/gen/app_localizations.dart';
 
@@ -8,6 +9,20 @@ class LoadingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       const Center(child: CircularProgressIndicator());
+}
+
+/// A column of shimmering list-tile placeholders — use instead of
+/// [LoadingView] wherever the loaded content is a list, so the screen reads
+/// as "already loading your content" rather than a bare spinner.
+class SkeletonListView extends StatelessWidget {
+  const SkeletonListView({super.key, this.count = 5});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        children:
+            List.generate(count, (_) => const SkeletonListTile()),
+      );
 }
 
 class ErrorView extends StatelessWidget {
@@ -28,23 +43,12 @@ class ErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline,
-                color: Theme.of(context).colorScheme.error, size: 40),
-            const SizedBox(height: 12),
-            Text(_message(l10n), textAlign: TextAlign.center),
-            if (onRetry != null) ...[
-              const SizedBox(height: 12),
-              FilledButton(onPressed: onRetry, child: Text(l10n.commonRetry)),
-            ],
-          ],
-        ),
-      ),
+    return AppEmptyState(
+      icon: Icons.error_outline,
+      title: _message(l10n),
+      action: onRetry == null
+          ? null
+          : FilledButton(onPressed: onRetry, child: Text(l10n.commonRetry)),
     );
   }
 }
@@ -57,23 +61,7 @@ class EmptyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 40, color: Theme.of(context).colorScheme.outline),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Theme.of(context).colorScheme.outline),
-            ),
-          ],
-        ),
-      ),
-    );
+    return AppEmptyState(icon: icon, title: message);
   }
 }
 
