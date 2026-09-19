@@ -1,5 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Required for LocationService/geolocator (T117) — without these declared,
+         Geolocator.requestPermission() gets silently denied by the OS with no
+         permission dialog shown at all, rather than actually prompting the user. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <application
         android:label="stranger_flutter"
         android:name="${applicationName}"
