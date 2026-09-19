@@ -199,6 +199,10 @@ services:
       EVENT_BUS_DRIVER: kafka
       KAFKA_BROKERS: kafka:9092
       DATABASE_URL: postgresql://identity_profile:${DB_PASSWORD}@postgres-identity-profile:5432/identity_profile?schema=public
+      # External URL, not internal Docker hostname — used to build links sent in
+      # emails (e.g. verification), which the recipient's own device must be able
+      # to open.
+      PUBLIC_BASE_URL: https://${SITE_ADDRESS}/api/identity-profile
     depends_on:
       redis:
         condition: service_healthy
@@ -216,6 +220,9 @@ services:
       EVENT_BUS_DRIVER: kafka
       KAFKA_BROKERS: kafka:9092
       DATABASE_URL: postgresql://offer:${DB_PASSWORD}@postgres-offer:5432/offer?schema=public
+      TRUST_SAFETY_BASE_URL: http://trust-safety:3006
+      ENTITLEMENTS_BASE_URL: http://entitlements-billing:3007
+      PARTICIPATION_BASE_URL: http://participation:3004
     depends_on:
       redis:
         condition: service_healthy
@@ -233,6 +240,7 @@ services:
       EVENT_BUS_DRIVER: kafka
       KAFKA_BROKERS: kafka:9092
       DATABASE_URL: postgresql://discovery_location:${DB_PASSWORD}@postgres-discovery-location:5432/discovery_location?schema=public
+      TRUST_SAFETY_BASE_URL: http://trust-safety:3006
     depends_on:
       redis:
         condition: service_healthy
@@ -250,6 +258,9 @@ services:
       EVENT_BUS_DRIVER: kafka
       KAFKA_BROKERS: kafka:9092
       DATABASE_URL: postgresql://participation:${DB_PASSWORD}@postgres-participation:5432/participation?schema=public
+      OFFER_BASE_URL: http://offer:3002
+      DISCOVERY_BASE_URL: http://discovery-location:3003
+      TRUST_SAFETY_BASE_URL: http://trust-safety:3006
     depends_on:
       redis:
         condition: service_healthy
@@ -267,6 +278,8 @@ services:
       EVENT_BUS_DRIVER: kafka
       KAFKA_BROKERS: kafka:9092
       DATABASE_URL: postgresql://messaging:${DB_PASSWORD}@postgres-messaging:5432/messaging?schema=public
+      OFFER_BASE_URL: http://offer:3002
+      TRUST_SAFETY_BASE_URL: http://trust-safety:3006
     depends_on:
       redis:
         condition: service_healthy
@@ -284,6 +297,8 @@ services:
       EVENT_BUS_DRIVER: kafka
       KAFKA_BROKERS: kafka:9092
       DATABASE_URL: postgresql://trust_safety:${DB_PASSWORD}@postgres-trust-safety:5432/trust_safety?schema=public
+      OFFER_BASE_URL: http://offer:3002
+      PARTICIPATION_BASE_URL: http://participation:3004
     depends_on:
       redis:
         condition: service_healthy
@@ -318,6 +333,10 @@ services:
       EVENT_BUS_DRIVER: kafka
       KAFKA_BROKERS: kafka:9092
       DATABASE_URL: postgresql://notification:${DB_PASSWORD}@postgres-notification:5432/notification?schema=public
+      OFFER_BASE_URL: http://offer:3002
+      PARTICIPATION_BASE_URL: http://participation:3004
+      DISCOVERY_BASE_URL: http://discovery-location:3003
+      IDENTITY_BASE_URL: http://identity-profile:3001
     depends_on:
       redis:
         condition: service_healthy
