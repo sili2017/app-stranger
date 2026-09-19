@@ -14,6 +14,12 @@ import 'screens/home_shell.dart';
 // blank screen with nothing in the OS logs pointing at why. Catch it here
 // and render something instead of nothing.
 void main() {
+  // Required before any platform-channel call (SharedPreferences.getInstance()
+  // in Session.load() below is one) made before runApp() — runApp() normally
+  // does this implicitly, but Session.load() runs first here. Its absence is
+  // what actually caused the original blank screen: ServicesBinding.instance
+  // null-checks an uninitialized binding, and release mode swallows it silently.
+  WidgetsFlutterBinding.ensureInitialized();
   ErrorWidget.builder = (details) =>
       _StartupErrorApp(error: details.exception, stackTrace: details.stack);
   runZonedGuarded(() async {
