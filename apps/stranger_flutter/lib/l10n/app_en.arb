@@ -104,6 +104,12 @@
   "publishMoneyNoteHint": "e.g. \"roughly 200 each\"",
   "publishSubmit": "Publish",
   "publishSetLocationFirst": "Set a location first (use current location or enter manually).",
+  "publishLocationSet": "Location set: {lat}, {lng}",
+  "@publishLocationSet": {"placeholders": {"lat": {"type": "String"}, "lng": {"type": "String"}}},
+  "publishLocationAccuracy": "accuracy about {meters} m",
+  "@publishLocationAccuracy": {"placeholders": {"meters": {"type": "int"}}},
+  "publishLocationLastKnown": "last known location, not live",
+  "feedLocationServiceDisabled": "Location Services are turned off on this device. Turn them on in system settings, then try again.",
 
   "offerDetailTitle": "Offer",
   "offerStatusActive": "active",

@@ -70,6 +70,8 @@ class _PublishScreenState extends State<PublishScreen> {
   String _placeKind = 'pin';
   double? _lat;
   double? _lng;
+  double? _locationAccuracy;
+  bool _locationIsLive = true;
   int _lifetimeMinutes = 15;
   int _capacity = 3;
   String _moneyLabel = 'creator_pays';
@@ -106,10 +108,20 @@ class _PublishScreenState extends State<PublishScreen> {
     if (!mounted) return;
     final result = await LocationService().getCurrentLocation();
     if (!mounted || result == null) return;
+    if (_lat == null) _applyLocation(result);
+    await _fillCityIfEmpty(result);
+  }
+
+  void _applyLocation(LocationResult result) {
     setState(() {
-      _lat ??= result.lat;
-      _lng ??= result.lng;
+      _lat = result.lat;
+      _lng = result.lng;
+      _locationAccuracy = result.accuracyMeters;
+      _locationIsLive = result.isLiveFix;
     });
+  }
+
+  Future<void> _fillCityIfEmpty(LocationResult result) async {
     if (_cityController.text.trim().isNotEmpty) return;
     final city = await _reverseGeocodeCity(result.lat, result.lng);
     if (!mounted || city == null) return;
@@ -154,24 +166,52 @@ class _PublishScreenState extends State<PublishScreen> {
     final locationService = LocationService();
     final result = await locationService.getCurrentLocation();
     if (!mounted) return;
-    setState(() {
-      _locating = false;
-      if (result != null) {
-        _lat = result.lat;
-        _lng = result.lng;
-      }
-    });
-    if (result == null && mounted) {
+    setState(() => _locating = false);
+    if (result == null) {
       final l10n = AppLocalizations.of(context)!;
       final message = switch (locationService.lastFailureReason) {
         LocationFailureReason.insecureOrigin => l10n.feedLocationInsecureOrigin,
         LocationFailureReason.permissionDenied =>
           l10n.feedLocationPermissionDenied,
+        LocationFailureReason.serviceDisabled =>
+          l10n.feedLocationServiceDisabled,
         LocationFailureReason.timedOut => l10n.feedLocationTimedOut,
         _ => l10n.feedLocationError,
       };
       showErrorSnackBar(context, message);
+      return;
     }
+    _applyLocation(result);
+    await _fillCityIfEmpty(result);
+  }
+
+  Widget _locationStatus(AppLocalizations l10n) {
+    final scheme = Theme.of(context).colorScheme;
+    final details = [
+      if (_locationAccuracy != null)
+        l10n.publishLocationAccuracy(_locationAccuracy!.round()),
+      if (!_locationIsLive) l10n.publishLocationLastKnown,
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.check_circle_outline, size: 18, color: scheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              [
+                l10n.publishLocationSet(
+                    _lat!.toStringAsFixed(4), _lng!.toStringAsFixed(4)),
+                if (details.isNotEmpty) '(${details.join(', ')})',
+              ].join(' '),
+              key: const ValueKey('publish-location-status'),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Opens a smiley grid and inserts the pick at the activity field's current cursor
@@ -427,6 +467,7 @@ class _PublishScreenState extends State<PublishScreen> {
                   ),
                 ],
               ),
+              if (_lat != null && _lng != null) _locationStatus(l10n),
               if (_requiresRendezvous) ...[
                 const SizedBox(height: 12),
                 TextFormField(

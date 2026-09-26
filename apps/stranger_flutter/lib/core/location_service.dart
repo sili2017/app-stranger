@@ -8,11 +8,18 @@ import 'package:geolocator/geolocator.dart';
 /// automatically — this class only adds the FR-005 last-known-location fallback that
 /// both platforms share, so callers never branch on `kIsWeb` themselves.
 class LocationResult {
-  LocationResult(
-      {required this.lat, required this.lng, required this.isLiveFix});
+  LocationResult({
+    required this.lat,
+    required this.lng,
+    required this.isLiveFix,
+    this.accuracyMeters,
+  });
   final double lat;
   final double lng;
   final bool isLiveFix;
+
+  /// Null for a last-known fix, or when the platform reports no accuracy (0).
+  final double? accuracyMeters;
 }
 
 /// Why [LocationService.getCurrentLocation] returned null — distinct from a plain
@@ -85,7 +92,11 @@ class LocationService {
           timeLimit: _isWeb ? _webCompensatedTimeLimit(attempt.$2) : attempt.$2,
         ).timeout(attempt.$2 + const Duration(seconds: 2));
         return LocationResult(
-            lat: position.latitude, lng: position.longitude, isLiveFix: true);
+          lat: position.latitude,
+          lng: position.longitude,
+          isLiveFix: true,
+          accuracyMeters: position.accuracy > 0 ? position.accuracy : null,
+        );
       } catch (e) {
         _recordFailureReason(e);
       }
