@@ -40,6 +40,18 @@
 	# Flutter Web (compiled release build), same as nginx.conf's `root`/`try_files`.
 	handle {
 		root * /usr/share/caddy
+		# Flutter's default build doesn't content-hash main.dart.js/index.html, and
+		# neither Caddy nor nginx sets Cache-Control by default — so with no header
+		# here, browsers apply heuristic caching (based on Last-Modified) and can go
+		# on serving an old main.dart.js for a long time after a deploy without even
+		# asking the server, silently undoing whatever was just shipped. Verified
+		# live: a plain `fetch('/main.dart.js')` right after a fresh deploy returned
+		# a week-old Last-Modified from the browser's disk cache, while the same
+		# request with `cache: 'no-store'` got the just-deployed one. `no-cache`
+		# forces a conditional revalidation (If-Modified-Since/If-None-Match) on
+		# every load instead — cheap for a app this size, and it means a deploy is
+		# never silently masked by a stale cache again.
+		header Cache-Control "no-cache"
 		try_files {path} /index.html
 		file_server
 	}
