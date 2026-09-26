@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:geolocator/geolocator.dart';
 
 /// T117: platform-abstracted location acquisition. `geolocator`'s federated plugin
@@ -39,7 +40,19 @@ enum LocationFailureReason {
 const _fixTimeout = Duration(seconds: 15);
 const _fallbackFixTimeout = Duration(seconds: 8);
 
+/// Bounds `geolocator_web`'s `requestPermission()` — see the `kIsWeb` branch in
+/// [LocationService._ensurePermission] for why that call needs a timeout of its own on
+/// web specifically, unlike every other platform's real, native permission dialog.
+const _webPermissionProbeTimeout = Duration(seconds: 12);
+
 class LocationService {
+  /// [isWeb] defaults to the real [kIsWeb] — overridable only so tests can exercise the
+  /// web-specific branch in [_ensurePermission] on the VM test runner, where [kIsWeb] is
+  /// always false.
+  LocationService({bool? isWeb}) : _isWeb = isWeb ?? kIsWeb;
+
+  final bool _isWeb;
+
   /// Set after a failed [getCurrentLocation] call (cleared at the start of the next
   /// one) — read this when that call returns null to show a specific error.
   LocationFailureReason? lastFailureReason;
@@ -87,6 +100,9 @@ class LocationService {
       return LocationResult(
           lat: last.latitude, lng: last.longitude, isLiveFix: false);
     } catch (_) {
+      // Expected on web: geolocator_web has no concept of an OS-cached last-known fix
+      // and always throws UnsupportedError here — that's "nothing cached", not a real
+      // failure, so it's folded into the same null result as an empty cache elsewhere.
       return null;
     }
   }
@@ -99,12 +115,51 @@ class LocationService {
         return false;
       }
 
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
+      final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.always ||
           permission == LocationPermission.whileInUse) {
+        return true;
+      }
+      if (permission == LocationPermission.deniedForever) {
+        lastFailureReason = LocationFailureReason.permissionDenied;
+        return false;
+      }
+
+      // Reached for LocationPermission.denied (not yet decided either way) and, on web
+      // only, .unableToDetermine — returned instead whenever a browser doesn't
+      // implement the Permissions API at all (notably the Safari family, desktop and
+      // iOS), which checkPermission() would otherwise misreport as a hard denial
+      // without ever trying to get a fix.
+      if (_isWeb) {
+        // geolocator_web's requestPermission() doesn't just surface the browser's
+        // permission prompt — verified by reading its source (geolocator_web 4.1.4):
+        // it calls the browser's getCurrentPosition() itself to *trigger* that prompt,
+        // with no timeout of its own, and maps ANY failure from that call — a slow
+        // fix, a network-positioning hiccup, anything, not just a real "no" — to
+        // LocationPermission.deniedForever. Two live-reproduced failure modes follow
+        // from that: (1) a user who genuinely grants permission but whose first fix is
+        // slow gets permanently misreported as having denied it, and the fix that call
+        // already obtained is thrown away; (2) with nothing bounding that wait, a
+        // stalled network-positioning lookup leaves the button spinning forever — the
+        // exact failure class the timeouts elsewhere in this file exist to prevent.
+        // So: bound the call, but never trust its verdict either way — always fall
+        // through to this service's own timed getCurrentPosition() loop below, which
+        // triggers that identical browser prompt (that's how
+        // navigator.geolocation.getCurrentPosition behaves when permission is
+        // undecided) under a timeout this service controls, with failures classified
+        // by this service's own, more accurate _recordFailureReason.
+        try {
+          await Geolocator.requestPermission()
+              .timeout(_webPermissionProbeTimeout);
+        } catch (_) {
+          // Deliberately ignored — see above.
+        }
+        return true;
+      }
+
+      final requested = await Geolocator.requestPermission();
+      if (requested == LocationPermission.always ||
+          requested == LocationPermission.whileInUse) {
         return true;
       }
       lastFailureReason = LocationFailureReason.permissionDenied;
@@ -115,13 +170,23 @@ class LocationService {
     }
   }
 
-  /// Browsers don't expose a typed exception for this — `navigator.geolocation`
-  /// rejects with a plain `PositionError` whose `message` is this literal English
-  /// string (verified live via Chrome DevTools against this exact origin), so pattern
-  /// match on it rather than a `code`, which is also `1` for a real permission denial.
+  /// Checks geolocator's own typed exceptions first (used natively on Android/iOS, and
+  /// by this service's own timed fetch loop on web). Browsers don't expose a typed
+  /// exception of their own, though: `navigator.geolocation` rejects with a plain
+  /// `PositionError` whose `message` is a literal English string (verified live via
+  /// Chrome DevTools against this exact origin) — hence the string-matching fallback,
+  /// matched on content rather than a `code`, which is also `1` for a real denial.
   void _recordFailureReason(Object e) {
     if (e is TimeoutException) {
       lastFailureReason = LocationFailureReason.timedOut;
+      return;
+    }
+    if (e is PermissionDeniedException) {
+      lastFailureReason = LocationFailureReason.permissionDenied;
+      return;
+    }
+    if (e is LocationServiceDisabledException) {
+      lastFailureReason = LocationFailureReason.serviceDisabled;
       return;
     }
     final message = e.toString().toLowerCase();
@@ -129,7 +194,7 @@ class LocationService {
       lastFailureReason = LocationFailureReason.insecureOrigin;
     } else if (message.contains('denied')) {
       lastFailureReason = LocationFailureReason.permissionDenied;
-    } else if (message.contains('timeout')) {
+    } else if (message.contains('timeout') || message.contains('timed out')) {
       lastFailureReason = LocationFailureReason.timedOut;
     } else {
       lastFailureReason ??= LocationFailureReason.unavailable;

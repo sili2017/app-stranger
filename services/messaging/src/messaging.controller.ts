@@ -17,7 +17,9 @@ export class MessagingController {
     private readonly internal: InternalClients,
   ) {}
 
-  /** T078: only conversations the caller is a member of. */
+  /** T078: only conversations the caller is a member of, most recently active first —
+   * "active" meaning the latest message in the chat, falling back to the chat's
+   * creation time for one that has no messages yet. */
   @Get('conversations')
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   async listConversations(@Req() req: Request) {
@@ -26,7 +28,23 @@ export class MessagingController {
       where: { userId },
       include: { chat: true },
     });
-    return memberships.map((m) => m.chat);
+    const chats = memberships.map((m) => m.chat);
+    if (chats.length === 0) return [];
+
+    // One message per chat — its latest — rather than `groupBy`'s `_max`, which would
+    // hand back only the timestamp and not the row.
+    const latestMessages = await this.prisma.message.findMany({
+      where: { chatId: { in: chats.map((c) => c.id) } },
+      orderBy: { createdAt: 'desc' },
+      distinct: ['chatId'],
+    });
+    const lastActivityAt = new Map(latestMessages.map((m) => [m.chatId, m.createdAt]));
+
+    return [...chats].sort((a, b) => {
+      const aTime = (lastActivityAt.get(a.id) ?? a.createdAt).getTime();
+      const bTime = (lastActivityAt.get(b.id) ?? b.createdAt).getTime();
+      return bTime - aTime;
+    });
   }
 
   /** Feature 24: total unread MESSAGE count across every chat the caller is in — one

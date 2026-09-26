@@ -34,8 +34,25 @@ export class FakePrismaService {
   message = {
     create: async ({ data }: any) => {
       const id = `msg-${this.messages.size + 1}`;
-      this.messages.set(id, { id, createdAt: new Date(), ...data });
-      return { id, ...data };
+      const row = { id, createdAt: new Date(), ...data };
+      this.messages.set(id, row);
+      return row;
+    },
+    findMany: async ({ where, orderBy, distinct }: any = {}) => {
+      let rows = [...this.messages.values()];
+      if (where?.chatId?.in) {
+        rows = rows.filter((m) => where.chatId.in.includes(m.chatId));
+      }
+      if (orderBy?.createdAt === 'desc') {
+        rows = rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      } else if (orderBy?.createdAt === 'asc') {
+        rows = rows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      }
+      if (distinct?.includes('chatId')) {
+        const seen = new Set<string>();
+        rows = rows.filter((m) => (seen.has(m.chatId) ? false : (seen.add(m.chatId), true)));
+      }
+      return rows;
     },
     count: async ({ where }: any) => {
       return [...this.messages.values()].filter((m) => {
@@ -72,8 +89,13 @@ export class FakePrismaService {
         null
       );
     },
-    findMany: async ({ where }: any) =>
-      [...this.memberships.values()].filter((m) => m.userId === where.userId),
+    findMany: async ({ where, include }: any) => {
+      const rows = [...this.memberships.values()].filter((m) => m.userId === where.userId);
+      if (include?.chat) {
+        return rows.map((m) => ({ ...m, chat: this.chats.get(m.chatId) ?? null }));
+      }
+      return rows;
+    },
     update: async ({ where, data }: any) => {
       const { chatId, userId } = where.chatId_userId;
       const existing = [...this.memberships.entries()].find(
