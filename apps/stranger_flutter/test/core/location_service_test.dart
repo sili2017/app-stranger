@@ -33,6 +33,7 @@ class FakeGeolocatorPlatform extends GeolocatorPlatform {
   Position? currentPosition;
   Object? currentPositionError;
   int getCurrentPositionCalls = 0;
+  List<LocationSettings?> receivedLocationSettings = [];
 
   Position? lastKnownPosition;
   Object? lastKnownPositionError;
@@ -54,6 +55,7 @@ class FakeGeolocatorPlatform extends GeolocatorPlatform {
   Future<Position> getCurrentPosition(
       {LocationSettings? locationSettings}) async {
     getCurrentPositionCalls++;
+    receivedLocationSettings.add(locationSettings);
     if (currentPositionError != null) throw currentPositionError!;
     return currentPosition!;
   }
@@ -179,6 +181,38 @@ void main() {
 
       expect(result, isNull);
       expect(service.lastFailureReason, LocationFailureReason.permissionDenied);
+    });
+  });
+
+  group(
+      'web timeLimit compensation (geolocator_web 4.1.4 microseconds/'
+      'milliseconds bug)', () {
+    // geolocator_web 4.1.4 converts the timeLimit Duration to the browser's
+    // millisecond-based PositionOptions.timeout via `.inMicroseconds` instead of
+    // `.inMilliseconds`, inflating it 1000x (a 15s timeLimit reaches the browser as
+    // ~4.2 hours) — confirmed live against a deployed build by instrumenting
+    // navigator.geolocation.getCurrentPosition. LocationService compensates on web by
+    // passing a Duration 1000x smaller so the browser ends up with the intended value.
+    test('shrinks timeLimit by 1000x on web to compensate', () async {
+      fake.checkPermissionResult = LocationPermission.whileInUse;
+      fake.currentPosition = _fakePosition();
+
+      await LocationService(isWeb: true).getCurrentLocation();
+
+      final sent = fake.receivedLocationSettings.single!;
+      // What geolocator_web will (buggily) read as the browser's millisecond timeout.
+      expect(sent.timeLimit!.inMicroseconds,
+          const Duration(seconds: 15).inMilliseconds);
+    });
+
+    test('leaves timeLimit untouched on native platforms', () async {
+      fake.checkPermissionResult = LocationPermission.whileInUse;
+      fake.currentPosition = _fakePosition();
+
+      await LocationService(isWeb: false).getCurrentLocation();
+
+      final sent = fake.receivedLocationSettings.single!;
+      expect(sent.timeLimit, const Duration(seconds: 15));
     });
   });
 }

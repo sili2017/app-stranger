@@ -82,7 +82,7 @@ class LocationService {
       try {
         final position = await Geolocator.getCurrentPosition(
           desiredAccuracy: attempt.$1,
-          timeLimit: attempt.$2,
+          timeLimit: _isWeb ? _webCompensatedTimeLimit(attempt.$2) : attempt.$2,
         ).timeout(attempt.$2 + const Duration(seconds: 2));
         return LocationResult(
             lat: position.latitude, lng: position.longitude, isLiveFix: true);
@@ -92,6 +92,24 @@ class LocationService {
     }
     return _lastKnownFallback();
   }
+
+  /// Compensates a real bug in `geolocator_web` 4.1.4 (`HtmlGeolocationManager.
+  /// getCurrentPosition`, verified by reading its source and then confirmed live —
+  /// instrumenting `navigator.geolocation.getCurrentPosition` against this exact
+  /// deployed build showed it): it converts the `timeLimit` Duration to the browser's
+  /// millisecond-based `PositionOptions.timeout` via `.inMicroseconds` instead of
+  /// `.inMilliseconds`, so a 15-second `timeLimit` reaches the browser as
+  /// ~15,000,000ms (~4.2 hours). That silently disables the one safety net the
+  /// browser itself would otherwise provide if the OS/network location lookup
+  /// stalls — precisely the "not even its own explicit timeout option fires" failure
+  /// mode this file's own `.timeout()` wrapper below exists to catch, which makes that
+  /// wrapper load-bearing rather than belt-and-braces on web: it's the only timeout
+  /// that reliably fires. Passing a Duration exactly 1000x smaller than intended
+  /// exploits that same bug to cancel it out — once wrongly read via
+  /// `.inMicroseconds`, the browser ends up with the millisecond value this service
+  /// actually meant. Android/iOS are unaffected and get the real Duration unchanged.
+  Duration _webCompensatedTimeLimit(Duration intended) =>
+      Duration(microseconds: intended.inMilliseconds);
 
   Future<LocationResult?> _lastKnownFallback() async {
     try {
