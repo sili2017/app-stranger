@@ -1,12 +1,14 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// T117: platform-abstracted location acquisition. `geolocator`'s federated plugin
 /// resolves to the native GPS API on mobile and the browser Geolocation API on web
-/// automatically — this class only adds the FR-005 last-known-location fallback that
-/// both platforms share, so callers never branch on `kIsWeb` themselves.
+/// automatically. This class adds what neither gives us on its own: one shared
+/// in-flight request, a short-lived reuse of a recent fix, and a last-known-location
+/// fallback (FR-005) that also works on web, where the plugin has none.
 class LocationResult {
   LocationResult({
     required this.lat,
@@ -37,110 +39,184 @@ enum LocationFailureReason {
   unavailable,
 }
 
-/// How long to wait for a fix before giving up — belt-and-braces alongside
-/// [Geolocator.getCurrentPosition]'s own `timeLimit`. Verified live (via CDP against
-/// this exact browser/origin) that a stalled OS-level location provider can leave the
-/// browser's `getCurrentPosition` never invoking either callback at all — not even its
-/// own explicit `timeout` option fires — so relying on the platform alone left the
-/// button spinning forever. This wraps the call in a plain Dart timer that always
-/// completes, regardless of what the platform does underneath.
-const _fixTimeout = Duration(seconds: 15);
-const _fallbackFixTimeout = Duration(seconds: 8);
+const _nativeFixTimeout = Duration(seconds: 15);
+const _nativeFallbackFixTimeout = Duration(seconds: 8);
 
-/// Bounds `geolocator_web`'s `requestPermission()` — see the `kIsWeb` branch in
-/// [LocationService._ensurePermission] for why that call needs a timeout of its own on
-/// web specifically, unlike every other platform's real, native permission dialog.
-const _webPermissionProbeTimeout = Duration(seconds: 12);
+/// Measured live in desktop Chrome: a cold first fix took ~10s, and later ones ~200ms.
+/// Giving up at 5-17s and re-asking (the old behaviour) abandoned fixes that were
+/// about to arrive; one patient request is what actually completes.
+const _defaultWebFixTimeout = Duration(seconds: 35);
+
+const _recentFixMaxAge = Duration(minutes: 2);
+const _storedFixMaxAge = Duration(hours: 24);
+const _prefLat = 'last_fix_lat';
+const _prefLng = 'last_fix_lng';
+const _prefAt = 'last_fix_at_ms';
+
+class _Outcome {
+  LocationResult? result;
+  LocationFailureReason? reason;
+}
 
 class LocationService {
-  /// [isWeb] defaults to the real [kIsWeb] — overridable only so tests can exercise the
-  /// web-specific branch in [_ensurePermission] on the VM test runner, where [kIsWeb] is
-  /// always false.
-  LocationService({bool? isWeb}) : _isWeb = isWeb ?? kIsWeb;
+  /// [isWeb] and [webFixTimeout] default to the real platform / production value —
+  /// overridable only so tests can exercise the web branch on the VM runner (where
+  /// [kIsWeb] is always false) without waiting out the real timeout.
+  LocationService({bool? isWeb, Duration? webFixTimeout})
+      : _isWeb = isWeb ?? kIsWeb,
+        _webFixTimeout = webFixTimeout ?? _defaultWebFixTimeout;
 
   final bool _isWeb;
+  final Duration _webFixTimeout;
+
+  static Future<_Outcome>? _inFlight;
+  static (LocationResult, DateTime)? _recentFix;
+
+  @visibleForTesting
+  static void resetSharedState() {
+    _inFlight = null;
+    _recentFix = null;
+  }
 
   /// Set after a failed [getCurrentLocation] call (cleared at the start of the next
   /// one) — read this when that call returns null to show a specific error.
   LocationFailureReason? lastFailureReason;
 
   /// Returns a live fix when permission is granted and a position is available;
-  /// otherwise falls back to the last known position (FR-005) if the platform has one
-  /// cached, and returns null only when neither is available at all.
+  /// otherwise falls back to the last known position (FR-005), and returns null only
+  /// when neither is available. Concurrent callers (e.g. the feed's 5s poll) share one
+  /// request instead of each hitting the location provider, and a live fix under two
+  /// minutes old is reused as is.
   Future<LocationResult?> getCurrentLocation() async {
     lastFailureReason = null;
-    final permission = await _ensurePermission();
-    if (!permission) {
-      return _lastKnownFallback();
+    final recent = _recentFix;
+    if (recent != null &&
+        DateTime.now().difference(recent.$2) < _recentFixMaxAge) {
+      return recent.$1;
     }
+    final outcome =
+        await (_inFlight ??= _acquire().whenComplete(() => _inFlight = null));
+    lastFailureReason = outcome.reason;
+    return outcome.result;
+  }
 
-    // This app only needs city/km-band-level precision (see the distance-band
-    // filter — <1km/1-5km/5-15km/15km+), never turn-by-turn accuracy, so
-    // `.high` (GPS-satellite-grade, can take 30s+ to lock indoors/without sky
-    // view) was demanding far more than needed and regularly timing out with
-    // nothing to fall back to on a device that had never gotten a fix before.
-    // `.medium` resolves via network/WiFi positioning too, not just GPS, and
-    // is dramatically faster in practice; if that still fails, one more quick
-    // attempt at the lowest accuracy tier before giving up on a live fix.
+  Future<_Outcome> _acquire() async {
+    final out = _Outcome();
+    if (await _ensurePermission(out)) {
+      final live = _isWeb ? await _webFix(out) : await _nativeFix(out);
+      if (live != null) {
+        _recentFix = (live, DateTime.now());
+        await _storeFix(live);
+        out.result = live;
+        return out;
+      }
+    }
+    out.result = await _lastKnownFallback();
+    return out;
+  }
+
+  /// Web: a single watch-style request, taking its first fix. Deliberately no retry
+  /// loop and no `timeLimit`: geolocator_web 4.1.4 converts `timeLimit` with
+  /// `.inMicroseconds` where the browser wants milliseconds (a 15s limit reaches the
+  /// browser as ~4 hours), so our own timer below is the only timeout that works.
+  Future<LocationResult?> _webFix(_Outcome out) async {
+    final completer = Completer<Position>();
+    final subscription = Geolocator.getPositionStream(
+      locationSettings:
+          const LocationSettings(accuracy: LocationAccuracy.medium),
+    ).listen(
+      (p) {
+        if (!completer.isCompleted) completer.complete(p);
+      },
+      onError: (Object e, StackTrace s) {
+        if (!completer.isCompleted) completer.completeError(e, s);
+      },
+      cancelOnError: true,
+    );
+    try {
+      return _fromPosition(await completer.future.timeout(_webFixTimeout));
+    } catch (e) {
+      _recordFailureReason(e, out);
+      return null;
+    } finally {
+      await subscription.cancel();
+    }
+  }
+
+  /// Android/iOS: this app only needs city/km-band-level precision, so `.medium`
+  /// (network/WiFi as well as GPS) with one quicker retry at the lowest tier. The
+  /// Dart-side timer is the backstop if the platform never calls back.
+  Future<LocationResult?> _nativeFix(_Outcome out) async {
     for (final attempt in [
-      (LocationAccuracy.medium, _fixTimeout),
-      (LocationAccuracy.lowest, _fallbackFixTimeout),
+      (LocationAccuracy.medium, _nativeFixTimeout),
+      (LocationAccuracy.lowest, _nativeFallbackFixTimeout),
     ]) {
       try {
         final position = await Geolocator.getCurrentPosition(
           desiredAccuracy: attempt.$1,
-          timeLimit: _isWeb ? _webCompensatedTimeLimit(attempt.$2) : attempt.$2,
+          timeLimit: attempt.$2,
         ).timeout(attempt.$2 + const Duration(seconds: 2));
-        return LocationResult(
-          lat: position.latitude,
-          lng: position.longitude,
-          isLiveFix: true,
-          accuracyMeters: position.accuracy > 0 ? position.accuracy : null,
-        );
+        return _fromPosition(position);
       } catch (e) {
-        _recordFailureReason(e);
+        _recordFailureReason(e, out);
       }
     }
-    return _lastKnownFallback();
+    return null;
   }
 
-  /// Compensates a real bug in `geolocator_web` 4.1.4 (`HtmlGeolocationManager.
-  /// getCurrentPosition`, verified by reading its source and then confirmed live —
-  /// instrumenting `navigator.geolocation.getCurrentPosition` against this exact
-  /// deployed build showed it): it converts the `timeLimit` Duration to the browser's
-  /// millisecond-based `PositionOptions.timeout` via `.inMicroseconds` instead of
-  /// `.inMilliseconds`, so a 15-second `timeLimit` reaches the browser as
-  /// ~15,000,000ms (~4.2 hours). That silently disables the one safety net the
-  /// browser itself would otherwise provide if the OS/network location lookup
-  /// stalls — precisely the "not even its own explicit timeout option fires" failure
-  /// mode this file's own `.timeout()` wrapper below exists to catch, which makes that
-  /// wrapper load-bearing rather than belt-and-braces on web: it's the only timeout
-  /// that reliably fires. Passing a Duration exactly 1000x smaller than intended
-  /// exploits that same bug to cancel it out — once wrongly read via
-  /// `.inMicroseconds`, the browser ends up with the millisecond value this service
-  /// actually meant. Android/iOS are unaffected and get the real Duration unchanged.
-  Duration _webCompensatedTimeLimit(Duration intended) =>
-      Duration(microseconds: intended.inMilliseconds);
+  LocationResult _fromPosition(Position p) => LocationResult(
+        lat: p.latitude,
+        lng: p.longitude,
+        isLiveFix: true,
+        accuracyMeters: p.accuracy > 0 ? p.accuracy : null,
+      );
 
   Future<LocationResult?> _lastKnownFallback() async {
     try {
       final last = await Geolocator.getLastKnownPosition();
-      if (last == null) return null;
-      return LocationResult(
-          lat: last.latitude, lng: last.longitude, isLiveFix: false);
+      if (last != null) {
+        return LocationResult(
+            lat: last.latitude, lng: last.longitude, isLiveFix: false);
+      }
     } catch (_) {
-      // Expected on web: geolocator_web has no concept of an OS-cached last-known fix
-      // and always throws UnsupportedError here — that's "nothing cached", not a real
-      // failure, so it's folded into the same null result as an empty cache elsewhere.
+      // Expected on web: geolocator_web has no OS-cached fix and always throws
+      // UnsupportedError here. Fall through to the fix we stored ourselves.
+    }
+    return _storedFix();
+  }
+
+  Future<void> _storeFix(LocationResult fix) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(_prefLat, fix.lat);
+      await prefs.setDouble(_prefLng, fix.lng);
+      await prefs.setInt(_prefAt, DateTime.now().millisecondsSinceEpoch);
+    } catch (_) {
+      // Best-effort: failing to remember a fix must never fail getting one.
+    }
+  }
+
+  Future<LocationResult?> _storedFix() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lat = prefs.getDouble(_prefLat);
+      final lng = prefs.getDouble(_prefLng);
+      final at = prefs.getInt(_prefAt);
+      if (lat == null || lng == null || at == null) return null;
+      final age =
+          DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(at));
+      if (age > _storedFixMaxAge) return null;
+      return LocationResult(lat: lat, lng: lng, isLiveFix: false);
+    } catch (_) {
       return null;
     }
   }
 
-  Future<bool> _ensurePermission() async {
+  Future<bool> _ensurePermission(_Outcome out) async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        lastFailureReason = LocationFailureReason.serviceDisabled;
+        out.reason = LocationFailureReason.serviceDisabled;
         return false;
       }
 
@@ -150,39 +226,17 @@ class LocationService {
         return true;
       }
       if (permission == LocationPermission.deniedForever) {
-        lastFailureReason = LocationFailureReason.permissionDenied;
+        out.reason = LocationFailureReason.permissionDenied;
         return false;
       }
 
-      // Reached for LocationPermission.denied (not yet decided either way) and, on web
-      // only, .unableToDetermine — returned instead whenever a browser doesn't
-      // implement the Permissions API at all (notably the Safari family, desktop and
-      // iOS), which checkPermission() would otherwise misreport as a hard denial
-      // without ever trying to get a fix.
+      // `denied` (not yet decided) or, on web only, `unableToDetermine` (browsers
+      // without the Permissions API, notably the Safari family).
       if (_isWeb) {
-        // geolocator_web's requestPermission() doesn't just surface the browser's
-        // permission prompt — verified by reading its source (geolocator_web 4.1.4):
-        // it calls the browser's getCurrentPosition() itself to *trigger* that prompt,
-        // with no timeout of its own, and maps ANY failure from that call — a slow
-        // fix, a network-positioning hiccup, anything, not just a real "no" — to
-        // LocationPermission.deniedForever. Two live-reproduced failure modes follow
-        // from that: (1) a user who genuinely grants permission but whose first fix is
-        // slow gets permanently misreported as having denied it, and the fix that call
-        // already obtained is thrown away; (2) with nothing bounding that wait, a
-        // stalled network-positioning lookup leaves the button spinning forever — the
-        // exact failure class the timeouts elsewhere in this file exist to prevent.
-        // So: bound the call, but never trust its verdict either way — always fall
-        // through to this service's own timed getCurrentPosition() loop below, which
-        // triggers that identical browser prompt (that's how
-        // navigator.geolocation.getCurrentPosition behaves when permission is
-        // undecided) under a timeout this service controls, with failures classified
-        // by this service's own, more accurate _recordFailureReason.
-        try {
-          await Geolocator.requestPermission()
-              .timeout(_webPermissionProbeTimeout);
-        } catch (_) {
-          // Deliberately ignored — see above.
-        }
+        // geolocator_web's requestPermission() is just a getCurrentPosition() call with
+        // no timeout whose result it throws away, and it maps any failure to a
+        // permanent "denied". The position request in _webFix triggers the same
+        // browser prompt and keeps the fix, so there is nothing to ask separately.
         return true;
       }
 
@@ -191,42 +245,41 @@ class LocationService {
           requested == LocationPermission.whileInUse) {
         return true;
       }
-      lastFailureReason = LocationFailureReason.permissionDenied;
+      out.reason = LocationFailureReason.permissionDenied;
       return false;
     } catch (e) {
-      _recordFailureReason(e);
+      _recordFailureReason(e, out);
       return false;
     }
   }
 
-  /// Checks geolocator's own typed exceptions first (used natively on Android/iOS, and
-  /// by this service's own timed fetch loop on web). Browsers don't expose a typed
+  /// Checks geolocator's own typed exceptions first. Browsers don't expose a typed
   /// exception of their own, though: `navigator.geolocation` rejects with a plain
   /// `PositionError` whose `message` is a literal English string (verified live via
   /// Chrome DevTools against this exact origin) — hence the string-matching fallback,
   /// matched on content rather than a `code`, which is also `1` for a real denial.
-  void _recordFailureReason(Object e) {
+  void _recordFailureReason(Object e, _Outcome out) {
     if (e is TimeoutException) {
-      lastFailureReason = LocationFailureReason.timedOut;
+      out.reason = LocationFailureReason.timedOut;
       return;
     }
     if (e is PermissionDeniedException) {
-      lastFailureReason = LocationFailureReason.permissionDenied;
+      out.reason = LocationFailureReason.permissionDenied;
       return;
     }
     if (e is LocationServiceDisabledException) {
-      lastFailureReason = LocationFailureReason.serviceDisabled;
+      out.reason = LocationFailureReason.serviceDisabled;
       return;
     }
     final message = e.toString().toLowerCase();
     if (message.contains('secure origin')) {
-      lastFailureReason = LocationFailureReason.insecureOrigin;
+      out.reason = LocationFailureReason.insecureOrigin;
     } else if (message.contains('denied')) {
-      lastFailureReason = LocationFailureReason.permissionDenied;
+      out.reason = LocationFailureReason.permissionDenied;
     } else if (message.contains('timeout') || message.contains('timed out')) {
-      lastFailureReason = LocationFailureReason.timedOut;
+      out.reason = LocationFailureReason.timedOut;
     } else {
-      lastFailureReason ??= LocationFailureReason.unavailable;
+      out.reason ??= LocationFailureReason.unavailable;
     }
   }
 }

@@ -467,7 +467,14 @@ class _PublishScreenState extends State<PublishScreen> {
                   ),
                 ],
               ),
-              if (_lat != null && _lng != null) _locationStatus(l10n),
+              if (_locating)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(l10n.publishLocating,
+                      key: const ValueKey('publish-locating-hint')),
+                )
+              else if (_lat != null && _lng != null)
+                _locationStatus(l10n),
               if (_requiresRendezvous) ...[
                 const SizedBox(height: 12),
                 TextFormField(

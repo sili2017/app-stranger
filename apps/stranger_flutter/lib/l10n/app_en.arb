@@ -104,6 +104,7 @@
   "publishMoneyNoteHint": "e.g. \"roughly 200 each\"",
   "publishSubmit": "Publish",
   "publishSetLocationFirst": "Set a location first (use current location or enter manually).",
+  "publishLocating": "Finding your location… this can take up to 30 seconds on some devices.",
   "publishLocationSet": "Location set: {lat}, {lng}",
   "@publishLocationSet": {"placeholders": {"lat": {"type": "String"}, "lng": {"type": "String"}}},
   "publishLocationAccuracy": "accuracy about {meters} m",

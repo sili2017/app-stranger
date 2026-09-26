@@ -104,6 +104,7 @@
   "publishMoneyNoteHint": "जैसे \"लगभग 200 प्रति व्यक्ति\"",
   "publishSubmit": "प्रकाशित करें",
   "publishSetLocationFirst": "पहले एक स्थान सेट करें (वर्तमान स्थान का उपयोग करें या मैन्युअल रूप से दर्ज करें)।",
+  "publishLocating": "आपका स्थान खोजा जा रहा है… कुछ डिवाइस पर इसमें 30 सेकंड तक लग सकते हैं।",
   "publishLocationSet": "स्थान सेट किया गया: {lat}, {lng}",
   "@publishLocationSet": {"placeholders": {"lat": {"type": "String"}, "lng": {"type": "String"}}},
   "publishLocationAccuracy": "सटीकता लगभग {meters} मी",
